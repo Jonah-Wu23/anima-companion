@@ -4,3 +4,11 @@ log_level: "debug"
 features:
   enable_vad: false
   enable_memory_write: true
+tts:
+  provider: "gpt_sovits_api_v2"
+  base_url: "http://127.0.0.1:9880"
+  timeout_seconds: 60
+  # 注意：路径相对 GPT-SoVITS 根目录
+  default_ref_audio_path: "参考音频/placeholder.wav"
+  default_prompt_text: "这里替换为参考音频对应文本"
+  default_prompt_lang: "zh"

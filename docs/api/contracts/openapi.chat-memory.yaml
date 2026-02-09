@@ -21,3 +21,29 @@ paths:
       responses:
         "200":
           description: ok
+  /v1/tts/synthesize:
+    post:
+      summary: 语音合成代理（GPT-SoVITS）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, text_lang, ref_audio_path, prompt_lang]
+              properties:
+                text:
+                  type: string
+                text_lang:
+                  type: string
+                  enum: [zh, en, ja]
+                ref_audio_path:
+                  type: string
+                prompt_lang:
+                  type: string
+                  enum: [zh, en, ja]
+                prompt_text:
+                  type: string
+      responses:
+        "200":
+          description: wav audio stream

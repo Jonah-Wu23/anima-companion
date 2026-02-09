@@ -16,3 +16,11 @@
 ## 维护规则
 - 接口层只做协议转换，不写业务逻辑。
 - `services` 间交互必须通过清晰接口，不直接跨目录读写实现细节。
+
+## GPT-SoVITS 接入（本地）
+1. 启动本地 GPT-SoVITS API：
+   `pwsh ..\\scripts\\dev\\start_gpt_sovits_api.ps1`
+2. 启动服务端：
+   `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+3. 调用代理接口：
+   `POST /v1/tts/synthesize`（服务端会转发到 GPT-SoVITS `/tts`）。

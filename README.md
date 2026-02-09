@@ -23,4 +23,5 @@ scripts/            # 本地开发与验证脚本
 ## 本地维护命令
 - `pwsh ./scripts/validation/validate_configs.ps1`：校验关键配置与人物卡 JSON。
 - `pwsh ./scripts/bootstrap/init_workspace.ps1`：初始化工作区（骨架阶段占位）。
-- `pwsh ./scripts/dev/run_local_stack.ps1`：本地联调入口（占位）。
+- `pwsh ./scripts/dev/start_gpt_sovits_api.ps1`：启动本地 GPT-SoVITS API（api_v2）。
+- `pwsh ./scripts/dev/run_local_stack.ps1`：查看本地联调启动顺序。
