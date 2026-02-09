@@ -1,0 +1,12 @@
+{
+  "name": "anima-companion",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["web"],
+  "scripts": {
+    "dev:web": "npm --workspace web run dev",
+    "build:web": "npm --workspace web run build",
+    "lint:web": "npm --workspace web run lint",
+    "typecheck:web": "npm --workspace web run typecheck"
+  }
+}

@@ -1,9 +1,5 @@
-# Android 分层约束
+# Android 分层约束（已归档）
 
-## 依赖方向
-`feature -> domain -> data -> core`
+当前仓库主路线已切换为 Web/PWA，本文件保留为历史记录。
 
-## 规则
-- `feature` 仅依赖 `domain` 接口，不直接调用网络层。
-- `data` 实现仓库接口并对接远端/本地数据源。
-- `core` 提供通用能力，不感知具体业务语义。
+最新客户端架构请参考：`docs/architecture/client/web_layers.md`

@@ -9,6 +9,7 @@
 
 ## 当前可用脚本
 - `dev/start_gpt_sovits_api.ps1`：启动本地 GPT-SoVITS `api_v2.py`
+- `dev/start_web.ps1`：启动 Web 前端开发环境
 - `validation/validate_configs.ps1`：校验人物卡 JSON
 
 ## 约定

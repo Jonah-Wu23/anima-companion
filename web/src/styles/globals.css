@@ -1,0 +1,27 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f4f7fb;
+  color: #1b2533;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  border: 1px solid #d7e0ed;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+}
