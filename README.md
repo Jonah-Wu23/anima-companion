@@ -19,3 +19,8 @@ scripts/            # 本地开发与验证脚本
 - 关键架构决策记录到 `docs/adr/`。
 - 业务规则优先配置化，落在 `configs/`，避免硬编码。
 - 每个顶层目录维护自己的 `README.md`，说明边界与入口命令。
+
+## 本地维护命令
+- `pwsh ./scripts/validation/validate_configs.ps1`：校验关键配置与人物卡 JSON。
+- `pwsh ./scripts/bootstrap/init_workspace.ps1`：初始化工作区（骨架阶段占位）。
+- `pwsh ./scripts/dev/run_local_stack.ps1`：本地联调入口（占位）。

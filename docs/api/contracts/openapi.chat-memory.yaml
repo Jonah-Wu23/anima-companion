@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Anima Companion API
+  version: 0.1.0
+paths:
+  /v1/chat/text:
+    post:
+      summary: 文本对话
+      responses:
+        "200":
+          description: ok
+  /v1/chat/voice:
+    post:
+      summary: 语音对话
+      responses:
+        "200":
+          description: ok
+  /v1/memory/upsert:
+    post:
+      summary: 写入记忆
+      responses:
+        "200":
+          description: ok

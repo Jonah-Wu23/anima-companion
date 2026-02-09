@@ -1,0 +1,6 @@
+env: staging
+api_base_url: "https://staging-api.example.com"
+log_level: "info"
+features:
+  enable_vad: true
+  enable_memory_write: true

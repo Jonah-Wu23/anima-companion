@@ -1,0 +1,6 @@
+env: dev
+api_base_url: "http://localhost:8000"
+log_level: "debug"
+features:
+  enable_vad: false
+  enable_memory_write: true

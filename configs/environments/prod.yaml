@@ -1,0 +1,6 @@
+env: prod
+api_base_url: "https://api.example.com"
+log_level: "warn"
+features:
+  enable_vad: true
+  enable_memory_write: true

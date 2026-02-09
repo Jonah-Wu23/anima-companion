@@ -1,0 +1,19 @@
+events:
+  - id: daily_greeting_morning
+    type: daily
+    weight: 10
+    trigger:
+      hour_range: [6, 10]
+    effect:
+      relationship:
+        trust: 1
+    response_style: "温柔"
+  - id: study_focus_session
+    type: activity
+    weight: 6
+    trigger:
+      user_intent: "学习"
+    effect:
+      relationship:
+        reliance: 1
+    response_style: "鼓励"

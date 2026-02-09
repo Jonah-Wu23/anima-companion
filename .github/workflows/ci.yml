@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  config-validation:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate persona card json
+        shell: pwsh
+        run: |
+          Get-Content -Raw ".\Phainon_actor_card.json" | ConvertFrom-Json > $null
