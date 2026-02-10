@@ -13,7 +13,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate persona card json
+      - name: Run config validation script
         shell: pwsh
         run: |
-          Get-Content -Raw ".\Phainon_actor_card.json" | ConvertFrom-Json > $null
+          .\scripts\validation\validate_configs.ps1
+
+      - name: Optional web typecheck
+        shell: pwsh
+        run: |
+          .\scripts\validation\optional_web_typecheck.ps1 -InstallDependencies -SkipOnInstallFailure

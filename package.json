@@ -2,11 +2,27 @@
   "name": "anima-companion",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["web"],
+  "workspaces": [
+    "web"
+  ],
   "scripts": {
     "dev:web": "npm --workspace web run dev",
     "build:web": "npm --workspace web run build",
     "lint:web": "npm --workspace web run lint",
     "typecheck:web": "npm --workspace web run typecheck"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.20",
+    "axios": "^1.13.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.4.0",
+    "zustand": "^5.0.11"
+  },
+  "overrides": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }

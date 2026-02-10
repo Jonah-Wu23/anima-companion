@@ -7,13 +7,270 @@ events:
     effect:
       relationship:
         trust: 1
+        reliance: 0
+        fatigue: 0
     response_style: "温柔"
-  - id: study_focus_session
+  - id: daily_midday_checkin
+    type: daily
+    weight: 8
+    trigger:
+      hour_range: [11, 14]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "轻松"
+  - id: daily_evening_wrapup
+    type: daily
+    weight: 9
+    trigger:
+      hour_range: [18, 22]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "复盘"
+  - id: daily_night_winddown
+    type: daily
+    weight: 7
+    trigger:
+      hour_range: [22, 24]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: -1
+    response_style: "安抚"
+  - id: activity_study_focus_session
     type: activity
     weight: 6
     trigger:
       user_intent: "学习"
     effect:
       relationship:
+        trust: 1
         reliance: 1
+        fatigue: 0
     response_style: "鼓励"
+  - id: activity_work_deep_focus
+    type: activity
+    weight: 6
+    trigger:
+      user_intent: "工作"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 1
+        fatigue: 0
+    response_style: "专业"
+  - id: activity_exercise_start
+    type: activity
+    weight: 5
+    trigger:
+      user_intent: "运动开始"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: -1
+    response_style: "打气"
+  - id: activity_exercise_done
+    type: activity
+    weight: 5
+    trigger:
+      user_intent: "运动完成"
+    effect:
+      relationship:
+        trust: 2
+        reliance: 0
+        fatigue: -1
+    response_style: "庆祝"
+  - id: activity_commute_companion
+    type: activity
+    weight: 4
+    trigger:
+      user_intent: "通勤"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "陪伴"
+  - id: emotion_user_anxious
+    type: emotion
+    weight: 9
+    trigger:
+      user_emotion: "anxious"
+    effect:
+      relationship:
+        trust: 2
+        reliance: 1
+        fatigue: -1
+    response_style: "安抚"
+  - id: emotion_user_sad
+    type: emotion
+    weight: 9
+    trigger:
+      user_emotion: "sad"
+    effect:
+      relationship:
+        trust: 2
+        reliance: 1
+        fatigue: -1
+    response_style: "共情"
+  - id: emotion_user_angry
+    type: emotion
+    weight: 7
+    trigger:
+      user_emotion: "angry"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "降温"
+  - id: emotion_user_happy
+    type: emotion
+    weight: 7
+    trigger:
+      user_emotion: "happy"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: -1
+    response_style: "分享喜悦"
+  - id: relation_low_trust_repair
+    type: relationship
+    weight: 8
+    trigger:
+      trust_range: [0, 20]
+    effect:
+      relationship:
+        trust: 2
+        reliance: 0
+        fatigue: 0
+    response_style: "修复关系"
+  - id: relation_high_trust_reward
+    type: relationship
+    weight: 5
+    trigger:
+      trust_range: [70, 100]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "默契"
+  - id: relation_high_reliance_guardrail
+    type: relationship
+    weight: 7
+    trigger:
+      reliance_range: [65, 100]
+    effect:
+      relationship:
+        trust: 1
+        reliance: -1
+        fatigue: 0
+    response_style: "边界提醒"
+  - id: memory_new_preference_saved
+    type: memory
+    weight: 5
+    trigger:
+      memory_event: "preference_saved"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "确认偏好"
+  - id: memory_taboo_respected
+    type: memory
+    weight: 6
+    trigger:
+      memory_event: "taboo_respected"
+    effect:
+      relationship:
+        trust: 2
+        reliance: 0
+        fatigue: 0
+    response_style: "尊重边界"
+  - id: story_rainy_day_window
+    type: story
+    weight: 3
+    trigger:
+      scene_tag: "rainy_day"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: 0
+    response_style: "氛围感"
+  - id: story_weekend_plan
+    type: story
+    weight: 4
+    trigger:
+      weekday: ["sat", "sun"]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: -1
+    response_style: "轻计划"
+  - id: story_deadline_support
+    type: story
+    weight: 6
+    trigger:
+      user_intent: "赶截止"
+    effect:
+      relationship:
+        trust: 1
+        reliance: 1
+        fatigue: 0
+    response_style: "战术支持"
+  - id: privacy_opt_in_reminder
+    type: privacy
+    weight: 4
+    trigger:
+      privacy_mode: "ask_opt_in"
+    effect:
+      relationship:
+        trust: 1
+        reliance: -1
+        fatigue: 0
+    response_style: "透明说明"
+  - id: privacy_opt_out_respect
+    type: privacy
+    weight: 5
+    trigger:
+      privacy_mode: "opt_out"
+    effect:
+      relationship:
+        trust: 2
+        reliance: -1
+        fatigue: 0
+    response_style: "克制"
+  - id: conflict_boundary_refusal
+    type: safety
+    weight: 8
+    trigger:
+      safety_risk: "dangerous_request"
+    effect:
+      relationship:
+        trust: 1
+        reliance: -1
+        fatigue: 0
+    response_style: "坚定拒绝"
+  - id: fatigue_high_rest_prompt
+    type: wellbeing
+    weight: 6
+    trigger:
+      fatigue_range: [60, 100]
+    effect:
+      relationship:
+        trust: 1
+        reliance: 0
+        fatigue: -2
+    response_style: "劝休息"

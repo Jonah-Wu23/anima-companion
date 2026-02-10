@@ -1,12 +1,12 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
 param(
   [string]$Root = "E:\\AI\\GPT-SoVITS-v4-20250422fix",
   [string]$Bind = "127.0.0.1",
   [int]$Port = 9880,
   [string]$Config = "GPT_SoVITS/configs/tts_infer.yaml"
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
 
 if (-not (Test-Path $Root)) {
   throw "GPT-SoVITS 目录不存在: $Root"

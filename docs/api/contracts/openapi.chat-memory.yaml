@@ -3,24 +3,80 @@ info:
   title: Anima Companion API
   version: 0.1.0
 paths:
+  /healthz:
+    get:
+      summary: 健康检查
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
   /v1/chat/text:
     post:
       summary: 文本对话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatTextRequest"
       responses:
         "200":
-          description: ok
+          description: 文本回复
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatTextResponse"
   /v1/chat/voice:
     post:
       summary: 语音对话
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio, session_id, persona_id]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                session_id:
+                  type: string
+                persona_id:
+                  type: string
+                lang:
+                  type: string
+                  default: zh
       responses:
         "200":
-          description: ok
-  /v1/memory/upsert:
+          description: 转写 + 回复 + base64 音频
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatVoiceResponse"
+  /v1/user/clear:
     post:
-      summary: 写入记忆
+      summary: 清除会话数据
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserClearRequest"
       responses:
         "200":
-          description: ok
+          description: 清理成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserClearResponse"
   /v1/tts/synthesize:
     post:
       summary: 语音合成代理（GPT-SoVITS）
@@ -47,3 +103,92 @@ paths:
       responses:
         "200":
           description: wav audio stream
+components:
+  schemas:
+    RelationshipDelta:
+      type: object
+      properties:
+        trust:
+          type: integer
+          default: 0
+        reliance:
+          type: integer
+          default: 0
+        fatigue:
+          type: integer
+          default: 0
+    MemoryWrite:
+      type: object
+      required: [key, value, type]
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        type:
+          type: string
+          enum: [preference, taboo, important_names, note]
+    ChatTextRequest:
+      type: object
+      required: [session_id, persona_id, user_text]
+      properties:
+        session_id:
+          type: string
+        persona_id:
+          type: string
+        user_text:
+          type: string
+    ChatTextResponse:
+      type: object
+      required:
+        [session_id, assistant_text, emotion, animation, relationship_delta, memory_writes]
+      properties:
+        session_id:
+          type: string
+        assistant_text:
+          type: string
+        emotion:
+          type: string
+          enum: [neutral, happy, sad, angry, shy]
+        animation:
+          type: string
+          enum: [idle, listen, think, speak, happy, sad, angry]
+        relationship_delta:
+          $ref: "#/components/schemas/RelationshipDelta"
+        memory_writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemoryWrite"
+    ChatVoiceResponse:
+      type: object
+      required:
+        [transcript_text, assistant_text, tts_media_type, tts_audio_base64, emotion, animation]
+      properties:
+        transcript_text:
+          type: string
+        assistant_text:
+          type: string
+        tts_media_type:
+          type: string
+          default: audio/wav
+        tts_audio_base64:
+          type: string
+          description: 音频内容（base64）
+        emotion:
+          type: string
+          enum: [neutral, happy, sad, angry, shy]
+        animation:
+          type: string
+          enum: [idle, listen, think, speak, happy, sad, angry]
+    UserClearRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+    UserClearResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean

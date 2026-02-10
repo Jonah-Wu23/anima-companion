@@ -1,30 +1,65 @@
-const apiPayloadExample = `{
-  "text": "你好，今天想聊什么？",
-  "text_lang": "zh",
-  "ref_audio_path": "参考音频/xxx.wav",
-  "prompt_lang": "zh",
-  "prompt_text": "你好，今天想聊什么？"
-}`;
+"use client";
 
-export default function HomePage() {
+import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { ChatShell } from '@/components/ChatShell';
+import { MessagePanel } from '@/components/MessagePanel';
+import { InputDock } from '@/components/InputDock';
+import { SettingsSheet } from '@/components/SettingsSheet';
+
+const Viewport3D = dynamic(
+  () => import('@/components/Viewport3D').then((mod) => mod.Viewport3D),
+  {
+    ssr: false,
+    loading: () => <div className="w-full h-full" />,
+  },
+);
+
+export default function Home() {
+  // Hydration check to prevent server/client mismatch with persisted store
+  const [mounted, setMounted] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
-    <main className="container">
-      <h1>Anima Companion Web MVP</h1>
-      <p>当前阶段目标：先跑通网页端文本/语音/3D 交互主链路。</p>
+    <ChatShell>
+      {/* 3D Viewport (Top/Background) */}
+      <div className="absolute top-0 left-0 w-full h-[40vh] bg-gradient-to-b from-blue-50 to-transparent z-0">
+        <Viewport3D />
+      </div>
 
-      <section className="panel">
-        <h2>当前技术栈</h2>
-        <ul>
-          <li>前端：Next.js + React + TypeScript</li>
-          <li>3D：Three.js（后续接入角色渲染与口型驱动）</li>
-          <li>后端：FastAPI（已接 GPT-SoVITS 本地代理）</li>
-        </ul>
-      </section>
+      {/* Main Content Area */}
+      <div className="flex flex-col h-full z-10 relative pointer-events-none">
+        {/* Header / TopBar */}
+        <div className="h-14 w-full flex items-center justify-between px-4 bg-white/80 backdrop-blur-sm border-b border-gray-100 shrink-0 pointer-events-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="font-semibold text-sm text-slate-700">白厄 (Bai E)</span>
+          </div>
+          <div className="text-xs text-gray-400">v0.1.0</div>
+        </div>
 
-      <section className="panel" style={{ marginTop: 16 }}>
-        <h2>TTS 代理接口示例</h2>
-        <pre>{apiPayloadExample}</pre>
-      </section>
-    </main>
+        {/* Scrollable Message Panel */}
+        <div className="flex-1 min-h-0 pointer-events-auto">
+            <MessagePanel />
+        </div>
+
+        {/* Fixed Input Dock */}
+        <div className="pointer-events-auto">
+            <InputDock onOpenSettings={() => setIsSettingsOpen(true)} />
+        </div>
+      </div>
+
+      {/* Settings Sheet Overlay */}
+      <SettingsSheet 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
+    </ChatShell>
   );
 }

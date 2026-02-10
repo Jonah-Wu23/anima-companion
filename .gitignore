@@ -40,3 +40,9 @@ build/
 out/
 tmp/
 temp/
+
+# cache
+web/.next/cache/
+
+# next
+web/.next/

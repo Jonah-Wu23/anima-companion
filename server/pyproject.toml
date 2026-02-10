@@ -5,6 +5,8 @@ description = "Backend services for anima companion android"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
+  "httpx>=0.28.0",
+  "python-multipart>=0.0.20",
   "uvicorn>=0.30.0",
 ]
 
