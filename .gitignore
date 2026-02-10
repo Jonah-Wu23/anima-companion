@@ -5,6 +5,8 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.trae/
+.github/
 *.iml
 
 # Logs
