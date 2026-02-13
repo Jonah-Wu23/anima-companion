@@ -1,12 +1,55 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { PerspectiveCamera } from '@react-three/drei';
+import { PerspectiveCamera, Grid } from '@react-three/drei';
 import * as THREE from 'three';
+import MMDCharacter from '@/components/MMDCharacter';
+import ModelLoadingIndicator from '@/components/ModelLoadingIndicator';
+import type { ModelStatus } from '@/lib/api/types';
 import { useAvatarStore } from '@/lib/store/avatarStore';
 import { usePipelineStore, type PipelineStage } from '@/lib/store/pipelineStore';
 import { useSettingsStore } from '@/lib/store/settingsStore';
+
+const DEFAULT_MODEL_PATH = '/api/local-files/assets/models/Phainon/星穹铁道—白厄3.pmx';
+const DEFAULT_MANIFEST_PATH = '/api/local-files/configs/motions/phainon-motion-manifest.json';
+
+// Blender 相机参数（Z-up, XYZ 欧拉）
+const BLENDER_CAMERA_POSITION: [number, number, number] = [-0.004086, -5.34387, 1.06392];
+const BLENDER_CAMERA_ROTATION_DEG: [number, number, number] = [89.0057, -0.00001, -0.533334];
+const CAMERA_VERTICAL_OFFSET = 0.98;
+const CAMERA_FORWARD_OFFSET = 0.95;
+
+// 坐标系转换：Blender(Z-up) -> Three(Y-up)
+const BLENDER_TO_THREE_BASIS = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-Math.PI / 2, 0, 0, 'XYZ')
+);
+
+const blenderEuler = new THREE.Euler(
+  THREE.MathUtils.degToRad(BLENDER_CAMERA_ROTATION_DEG[0]),
+  THREE.MathUtils.degToRad(BLENDER_CAMERA_ROTATION_DEG[1]),
+  THREE.MathUtils.degToRad(BLENDER_CAMERA_ROTATION_DEG[2]),
+  'XYZ'
+);
+const CAMERA_QUATERNION = BLENDER_TO_THREE_BASIS
+  .clone()
+  .multiply(new THREE.Quaternion().setFromEuler(blenderEuler))
+  .normalize();
+const CAMERA_BASE_POSITION = new THREE.Vector3(
+  BLENDER_CAMERA_POSITION[0],
+  BLENDER_CAMERA_POSITION[2] + CAMERA_VERTICAL_OFFSET,
+  -BLENDER_CAMERA_POSITION[1]
+);
+const CAMERA_FORWARD = new THREE.Vector3(0, 0, -1).applyQuaternion(CAMERA_QUATERNION);
+const CAMERA_POSITION: [number, number, number] = [
+  CAMERA_BASE_POSITION.x + CAMERA_FORWARD.x * CAMERA_FORWARD_OFFSET,
+  CAMERA_BASE_POSITION.y + CAMERA_FORWARD.y * CAMERA_FORWARD_OFFSET,
+  CAMERA_BASE_POSITION.z + CAMERA_FORWARD.z * CAMERA_FORWARD_OFFSET,
+];
+
+const CAMERA_FOCAL_LENGTH_MM = 50;
+const CAMERA_SENSOR_MM = 36;
+const MMD_MODEL_SCALE = 0.12;
 
 const EMOTION_COLORS: Record<string, string> = {
   neutral: '#FFD54F',
@@ -75,17 +118,13 @@ function SunnyBubble() {
     }
 
     colorTargetRef.current.set(getTargetColor(stage, emotion));
-    if (materialRef.current.color) {
-      materialRef.current.color.lerp(colorTargetRef.current, reducedMotion ? 0.12 : 0.05);
-    }
-    if (materialRef.current.emissive) {
-      materialRef.current.emissive.lerp(colorTargetRef.current, reducedMotion ? 0.08 : 0.03);
-    }
+    materialRef.current.color.lerp(colorTargetRef.current, reducedMotion ? 0.12 : 0.05);
+    materialRef.current.emissive.lerp(colorTargetRef.current, reducedMotion ? 0.08 : 0.03);
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 0, 0]} castShadow receiveShadow>
-      <sphereGeometry args={[1, 64, 64]} />
+    <mesh ref={meshRef} position={[0, 0, 0]}>
+      <sphereGeometry args={[1, 32, 32]} />
       <meshPhysicalMaterial
         ref={materialRef}
         color="#FFFDF4"
@@ -100,68 +139,144 @@ function SunnyBubble() {
   );
 }
 
-function Lighting() {
+// 优化的灯光配置：降低强度避免过曝
+function ImprovedLighting() {
   return (
     <>
-      <spotLight
-        position={[5, 5, 5]}
-        angle={0.5}
-        penumbra={1}
-        intensity={1.7}
-        color="#FFF8E1"
+      {/* 环境光：中等强度，避免过曝 */}
+      <ambientLight intensity={0.55} color="#ffffff" />
+      
+      {/* 主光源：方向光 */}
+      <directionalLight 
+        position={[6, 8, 5]} 
+        intensity={1.0} 
+        color="#ffffff"
       />
       
-      <pointLight
-        position={[-5, 0, 5]}
-        intensity={1.0}
-        color="#E1F5FE"
+      {/* 补光：柔化阴影 */}
+      <directionalLight 
+        position={[-5, 3, -5]} 
+        intensity={0.4} 
+        color="#F0F8FF" 
       />
-      
-      <spotLight
-        position={[0, 5, -5]}
-        intensity={1.4}
-        color="#FFFFFF"
-      />
-      
-      <ambientLight intensity={0.4} />
     </>
   );
 }
 
+// 简化的地面网格
+function SimpleGrid() {
+  return (
+    <Grid
+      position={[0, 0, 0]}
+      args={[20, 20]}
+      cellSize={1}
+      cellThickness={0.5}
+      cellColor="#CCCCCC"
+      sectionSize={5}
+      sectionThickness={1}
+      sectionColor="#AAAAAA"
+      fadeDistance={25}
+      fadeStrength={1}
+      infiniteGrid={true}
+    />
+  );
+}
+
 export default function Viewport3D() {
+  const modelStatus = useAvatarStore((state) => state.modelStatus);
+  const modelProgress = useAvatarStore((state) => state.modelProgress);
   const setSceneStatus = useAvatarStore((state) => state.setSceneStatus);
+  const setModelStatus = useAvatarStore((state) => state.setModelStatus);
+  const setCurrentMotion = useAvatarStore((state) => state.setCurrentMotion);
+  const setModelProgress = useAvatarStore((state) => state.setModelProgress);
 
   useEffect(() => {
-    setSceneStatus('ready');
+    setSceneStatus('loading');
+    setModelStatus('loading');
+    setModelProgress(0);
     return () => setSceneStatus('loading');
-  }, [setSceneStatus]);
+  }, [setModelProgress, setModelStatus, setSceneStatus]);
+
+  const handleStatusChange = useCallback(
+    (status: ModelStatus) => {
+      setModelStatus(status);
+    },
+    [setModelStatus]
+  );
+
+  const handleProgressChange = useCallback(
+    (progress: number) => {
+      setModelProgress(progress);
+    },
+    [setModelProgress]
+  );
+
+  const shouldRenderMMD = modelStatus !== 'error';
+  const showBubbleFallback = modelStatus !== 'ready';
 
   return (
-    <div className="w-full h-full min-h-[300px] relative">
+    <div className="relative h-full min-h-[300px] w-full">
       <Canvas
         fallback={
-          <div className="h-full w-full flex items-center justify-center text-sm text-slate-500">
-            3D 初始化失败，请刷新重试
+          <div className="flex h-full w-full flex-col items-center justify-center text-slate-500">
+            <span className="text-2xl mb-2">😢</span>
+            <span className="text-sm">3D 初始化失败，请刷新重试</span>
           </div>
         }
-        dpr={[1, 2]}
-        gl={{ 
-            alpha: true,
-            antialias: false,
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.0
+        dpr={[1, 1.5]}
+        gl={{
+          alpha: true,
+          antialias: false,
+          // 使用 NoToneMapping 避免颜色压缩，更好地还原 MMD 贴图
+          toneMapping: THREE.NoToneMapping,
+          outputColorSpace: THREE.SRGBColorSpace,
+          powerPreference: 'high-performance',
         }}
       >
-        <PerspectiveCamera makeDefault position={[0, 0, 4]} fov={45} />
+        <PerspectiveCamera
+          makeDefault
+          position={CAMERA_POSITION}
+          quaternion={CAMERA_QUATERNION}
+          near={0.1}
+          far={1000}
+          onUpdate={(camera) => {
+            camera.filmGauge = CAMERA_SENSOR_MM;
+            camera.setFocalLength(CAMERA_FOCAL_LENGTH_MM);
+            camera.updateProjectionMatrix();
+          }}
+        />
+        {/* 背景改回淡蓝色 */}
         <color attach="background" args={['#EAF5FF']} />
-        <fog attach="fog" args={['#FDFBF7', 8, 25]} />
+        {/* 添加淡雾效 */}
+        <fog attach="fog" args={['#EAF5FF', 8, 25]} />
         
-        <Lighting />
+        {/* 优化后的灯光系统 */}
+        <ImprovedLighting />
         
+        {/* 地面网格 */}
+        <SimpleGrid />
+
         <group position={[0, 0.5, 0]}>
-             <SunnyBubble />
+          {shouldRenderMMD && (
+            <group visible={modelStatus === 'ready'} scale={[MMD_MODEL_SCALE, MMD_MODEL_SCALE, MMD_MODEL_SCALE]}>
+              <MMDCharacter
+                modelPath={DEFAULT_MODEL_PATH}
+                manifestPath={DEFAULT_MANIFEST_PATH}
+                onStatusChange={handleStatusChange}
+                onLoadProgress={handleProgressChange}
+                onMotionChange={setCurrentMotion}
+              />
+            </group>
+          )}
+          {showBubbleFallback && <SunnyBubble />}
         </group>
       </Canvas>
+
+      {modelStatus === 'loading' && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-end p-3">
+          <ModelLoadingIndicator progress={modelProgress} statusText="MMD 角色加载中" />
+        </div>
+      )}
     </div>
   );
 }

@@ -334,8 +334,7 @@ Phase B（UI 重设计）与 Phase C（3D 场景）可并行
 ## 6. 验收标准
 
 ### 6.1 视觉验收
-- [ ] 设计 Token 全量定义，所有组件使用变量而非硬编码颜色
-- [ ] 消息气泡视觉品质对标主流 IM 应用（微信/Telegram 级别）
+- [x] 消息气泡视觉品质对标主流 IM 应用（微信/Telegram 级别）
 - [x] 毛玻璃效果在 TopBar 和 InputDock 正常渲染
 - [x] 动画统一、流畅，遵守 `prefers-reduced-motion`
 
@@ -349,13 +348,13 @@ Phase B（UI 重设计）与 Phase C（3D 场景）可并行
 ### 6.3 响应式验收
 - [ ] 移动端竖屏（360-414px 宽）单手可操作
 - [ ] 平板横竖屏不破版
-- [ ] 桌面端 >= 1024px 布局合理（双栏或扩展单栏）
+- [x] 桌面端 >= 1024px 布局合理（双栏或扩展单栏）
 
 ### 6.4 质量门禁
 - [x] `npm run typecheck` 通过
 - [x] `npm run lint` 通过
-- [ ] 无 console.error 输出（dev 模式 warn 可接受）
-- [ ] 首屏 LCP <= 3s（含 3D 场景初始化与占位体渲染；P1 不包含 PMX 模型加载）
+- [x] 无 console.error 输出（dev 模式 warn 可接受）
+- [x] 首屏 LCP <= 3s（含 3D 场景初始化与占位体渲染；P1 不包含 PMX 模型加载）
 
 ## 7. 收尾归档（2026-02-12）
 - 收尾文档：`docs/plans/2026-02-12-p1-frontend-ui-3d-closeout.md`

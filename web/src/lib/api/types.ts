@@ -2,6 +2,27 @@ export type Emotion = "neutral" | "happy" | "sad" | "angry" | "shy";
 export type Animation = "idle" | "listen" | "think" | "speak" | "happy" | "sad" | "angry";
 export type MemoryType = "preference" | "taboo" | "important_names" | "note";
 
+export type ModelStatus = "loading" | "ready" | "error";
+export type MotionState = "idle" | "listening" | "thinking" | "speaking" | "error";
+
+export interface MotionManifestCandidate {
+  asset_id: string;
+  path: string;
+  priority: number;
+  fallback: boolean;
+  risk?: string;
+}
+
+export interface MotionManifestState {
+  candidates: MotionManifestCandidate[];
+}
+
+export interface MotionManifestDocument {
+  version: number;
+  validated_at?: string;
+  states: Partial<Record<"Idle" | "Listening" | "Thinking" | "Speaking" | "Error", MotionManifestState>>;
+}
+
 export interface RelationshipDelta {
   trust: number;
   reliance: number;

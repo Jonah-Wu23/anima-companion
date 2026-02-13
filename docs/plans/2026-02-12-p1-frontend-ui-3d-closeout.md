@@ -82,3 +82,15 @@
 ## 8. 收尾判定
 - 判定：P1 收尾完成。
 - 建议状态：`Closed`（进入 P2 实施）。
+
+## 9. 2026-02-13 补充更新（联调基线）
+1. `scripts/dev/start_full_stack.py` 已收敛为固定后端端口 `18000`。
+2. Web 启动时注入的 API 基地址已固定为 `http://127.0.0.1:18000`，避免误连旧 `8000` 实例。
+3. LLM 端点已固定为 `/v1/chat/completions`，不再走 `/messages`。
+4. 角色输出长度上限已统一为“所有角色 50 字符”（不再仅对白厄放宽）。
+5. 语音文本提取增加容错与降级：无 `<speak>` 或异常标签时可回退到可读台词，避免整条语音链路失败。
+6. 新增 Kimi 诊断脚本：`scripts/dev/test_kimi_llm_pipeline.py`，用于核对请求 payload 与返回抽取解析。
+
+### 9.1 当前联调建议命令
+1. `python scripts/dev/start_full_stack.py`
+2. `python scripts/dev/test_kimi_llm_pipeline.py --persona-id phainon --user-text "你好" --base-url "https://api.moonshot.cn" --model "kimi-k2.5"`
