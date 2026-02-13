@@ -1,0 +1,77 @@
+version: 1
+validated_at: "2026-02-12"
+scope: "internal_validation_only"
+source_registry: "docs/assets/mmd-motion-registry.md"
+states:
+  Idle:
+    candidates:
+      - asset_id: "phainon_ot0510_standby_019"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_素立ち_まばたき付き.vmd"
+        priority: 1
+        fallback: false
+        risk: "low"
+      - asset_id: "phainon_ot0510_standby_001"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_Aスタンス.vmd"
+        priority: 2
+        fallback: true
+        risk: "low"
+  Speaking:
+    candidates:
+      - asset_id: "phainon_bg_loop_chat_003"
+        path: "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk1-east-謝.vmd"
+        priority: 1
+        fallback: false
+        risk: "medium"
+      - asset_id: "phainon_ot0510_standby_009"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_元気_まばたき付き.vmd"
+        priority: 2
+        fallback: true
+        risk: "low"
+  Listening:
+    candidates:
+      - asset_id: "phainon_ot0510_standby_007"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_両手後ろ_まばたき付き.vmd"
+        priority: 1
+        fallback: false
+        risk: "low"
+      - asset_id: "phainon_ot0510_standby_011"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_右手腰あて_まばたき付き.vmd"
+        priority: 2
+        fallback: true
+        risk: "low"
+  Thinking:
+    candidates:
+      - asset_id: "phainon_armcross_ia_001"
+        path: "assets/motions/phainon/raw/腕組みIA.モーション+/腕組みIA.モーション+/腕組みIA/腕組みIA.vmd"
+        priority: 1
+        fallback: false
+        risk: "medium"
+      - asset_id: "phainon_ot0510_standby_017"
+        path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_猫背_まばたき付き.vmd"
+        priority: 2
+        fallback: true
+        risk: "low"
+  Error:
+    candidates:
+      - asset_id: "phainon_dogeza_002"
+        path: "assets/motions/phainon/raw/土下座のモーション/土下座のモーション/受.vmd"
+        priority: 1
+        fallback: false
+        risk: "medium"
+      - asset_id: "phainon_bg_loop_chat_009"
+        path: "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk4-east-凹.vmd"
+        priority: 2
+        fallback: true
+        risk: "medium"
+high_risk_policy:
+  default_action: "exclude_from_release_build"
+  groups:
+    - source_zip: "ミニモーション集.zip"
+      risk: "high"
+      reason: "用途限制与再分发边界复杂（含 PV 向素材约束），仅内部验证。"
+      replacement_candidates:
+        - "phainon_ot0510_standby_019"
+        - "phainon_bg_loop_chat_003"
+        - "phainon_ot0510_standby_007"
+        - "phainon_armcross_ia_001"
+        - "phainon_dogeza_002"

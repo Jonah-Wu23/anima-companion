@@ -71,7 +71,7 @@ async def chat_voice(
     tts_error: str | None = None
     try:
         tts_media_type, tts_audio_base64 = synthesize_assistant_audio_base64(
-            text_result["assistant_text"]
+            str(text_result.get("assistant_raw_text", text_result["assistant_text"]))
         )
     except ChatServiceError as exc:
         tts_error = str(exc)

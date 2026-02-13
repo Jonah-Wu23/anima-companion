@@ -1,5 +1,6 @@
 param(
-  [int]$Port = 3000
+  [int]$Port = 3000,
+  [string]$ApiBaseUrl = ""
 )
 
 Set-StrictMode -Version Latest
@@ -30,6 +31,11 @@ if ($null -ne $listeningConn) {
 }
 
 Set-Location $webDir
+
+if ($ApiBaseUrl -and $ApiBaseUrl.Trim()) {
+  $env:NEXT_PUBLIC_API_BASE_URL = $ApiBaseUrl.Trim()
+  Write-Host "[web] 使用 NEXT_PUBLIC_API_BASE_URL=$($env:NEXT_PUBLIC_API_BASE_URL)"
+}
 
 if (-not (Test-Path "node_modules")) {
   Write-Host "[web] 安装依赖..."

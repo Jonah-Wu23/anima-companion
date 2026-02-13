@@ -19,7 +19,7 @@ from app.services.tts.gpt_sovits_client import GPTSoVITSClientError, synthesize
 class ChatServiceError(RuntimeError):
     """聊天服务失败。"""
 
-MAX_ASSISTANT_TEXT_CHARS = 50
+ASSISTANT_TEXT_CHAR_LIMIT = 50
 
 
 def run_text_chat(
@@ -37,18 +37,25 @@ def run_text_chat(
     settings = get_settings()
     history = store.list_recent_messages(session_id, limit=settings.dialogue_history_limit)
     relationship = store.get_relationship(session_id)
+    user_turns = store.count_user_turns(session_id)
 
     try:
         llm_raw_text = request_messages_completion(
             persona_id=persona_id,
             messages=history,
             relationship=relationship,
+            include_initial_injection=(user_turns <= 1),
         )
     except GPTSAPIAnthropicClientError as exc:
         raise ChatServiceError(str(exc)) from exc
 
     parsed = parse_labeled_response(llm_raw_text)
-    assistant_text = _sanitize_assistant_text(str(parsed["assistant_text"]))
+    raw_assistant_text = str(parsed["assistant_text"])
+    assistant_text = _sanitize_assistant_text(
+        raw_assistant_text,
+        max_chars=_resolve_assistant_text_limit(persona_id),
+    )
+    assistant_tts_text = _extract_tts_speak_text(raw_assistant_text)
     relationship_delta = dict(parsed["relationship_delta"])
     memory_writes = list(parsed["memory_writes"])
 
@@ -63,11 +70,23 @@ def run_text_chat(
         "animation": parsed["animation"],
         "relationship_delta": applied_relationship_delta,
         "memory_writes": memory_writes,
+        "assistant_raw_text": raw_assistant_text,
+        "assistant_tts_text": assistant_tts_text,
     }
 
 
 def synthesize_assistant_audio_base64(assistant_text: str) -> tuple[str, str]:
-    payload = build_default_tts_payload(assistant_text)
+    speak_text = _extract_tts_speak_text(assistant_text)
+    if not speak_text:
+        # 兼容模型未按约定输出 speak 标签时的降级路径，避免整条语音链路失败。
+        speak_text = _sanitize_assistant_text(
+            assistant_text,
+            max_chars=ASSISTANT_TEXT_CHAR_LIMIT,
+        )
+    if not _has_pronounceable_content(speak_text):
+        speak_text = "我在。"
+
+    payload = build_default_tts_payload(speak_text)
     try:
         audio_bytes, media_type = synthesize(payload)
     except GPTSoVITSClientError as exc:
@@ -120,10 +139,14 @@ def _normalize_ref_audio_path(raw_value: str) -> str:
     return text
 
 
-def _sanitize_assistant_text(raw_text: str) -> str:
+def _sanitize_assistant_text(raw_text: str, max_chars: int = ASSISTANT_TEXT_CHAR_LIMIT) -> str:
     text = str(raw_text or "").strip()
     if not text:
         return "我在。"
+
+    speak_text = _extract_tts_speak_text(text)
+    if speak_text:
+        text = speak_text
 
     # 去除常见动作/旁白包裹内容，只保留可直接说出口的台词。
     text = re.sub(r"\[[^\[\]]{1,60}\]", "", text)
@@ -134,16 +157,54 @@ def _sanitize_assistant_text(raw_text: str) -> str:
 
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if lines:
-        text = lines[0]
+        selected = ""
+        for line in lines:
+            if _has_pronounceable_content(line):
+                selected = line
+                break
+        text = selected or lines[0]
 
     text = re.sub(r"\s+", "", text)
     if not text:
         return "我在。"
 
-    if len(text) > MAX_ASSISTANT_TEXT_CHARS:
-        text = _truncate_text_prefer_punctuation(text, MAX_ASSISTANT_TEXT_CHARS)
+    if len(text) > max_chars:
+        text = _truncate_text_prefer_punctuation(text, max_chars)
+
+    if not _has_pronounceable_content(text):
+        return "我在。"
 
     return text or "我在。"
+
+
+def _extract_tts_speak_text(raw_text: str) -> str:
+    text = str(raw_text or "")
+    if not text:
+        return ""
+
+    blocks = re.findall(r"<speak>(.*?)</speak>", text, flags=re.IGNORECASE | re.DOTALL)
+    if not blocks:
+        # 兼容错误写法：<speak>你好<speak> 或仅有起始标签。
+        opens = list(re.finditer(r"<speak>", text, flags=re.IGNORECASE))
+        if len(opens) >= 2:
+            blocks = [text[opens[0].end() : opens[1].start()]]
+        elif len(opens) == 1:
+            blocks = [text[opens[0].end() :]]
+    if not blocks:
+        return ""
+
+    combined = "".join(part.strip() for part in blocks if part and part.strip())
+    combined = re.sub(r"<[^>]+>", "", combined)
+    return combined.strip()
+
+
+def _has_pronounceable_content(text: str) -> bool:
+    return bool(re.search(r"[0-9A-Za-z\u4e00-\u9fff]", str(text or "")))
+
+
+def _resolve_assistant_text_limit(persona_id: str) -> int:
+    _ = persona_id
+    return ASSISTANT_TEXT_CHAR_LIMIT
 
 
 def _truncate_text_prefer_punctuation(text: str, max_chars: int) -> str:

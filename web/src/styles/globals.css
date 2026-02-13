@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3b82f6;
+  /* 
+   * 1. Color Palette 
+   * "Sunshine Boy / White Samoyed" Vibe
+   * Warm, approachable, clean.
+   */
+
+  /* Primary: Clear Sky Blue */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9; /* Main Brand Color */
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+
+  --color-primary: var(--color-primary-500);
   --color-primary-foreground: #ffffff;
-  --color-background: #f4f7fb;
+
+  /* Secondary: Wheat Gold (Sunshine) */
+  --color-secondary-50: #fffbeb;
+  --color-secondary-100: #fef3c7;
+  --color-secondary-200: #fde68a;
+  --color-secondary-300: #fcd34d; /* Wheat */
+  --color-secondary-400: #fbbf24;
+  --color-secondary-500: #f59e0b; /* Gold */
+  --color-secondary-600: #d97706;
+  --color-secondary-700: #b45309;
+  --color-secondary-800: #92400e;
+  --color-secondary-900: #78350f;
+  --color-secondary-950: #451a03;
+
+  --color-secondary: var(--color-secondary-400);
+  --color-secondary-foreground: #1e293b;
+
+  /* Accent: Cream White (Warm, not sterile) */
+  --color-accent: #fffbf0;
+  --color-accent-foreground: #1e293b;
+
+  /* Neutral: Slate Scale (Balanced cool/warm) */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  --color-neutral-950: #020617;
+
+  /* Functional Colors */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Surface Colors */
+  --color-background: var(--color-neutral-50);
   --color-surface: #ffffff;
-  --color-surface-foreground: #1b2533;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
+  --color-surface-foreground: var(--color-neutral-900);
+  --color-muted: var(--color-neutral-500);
+  --color-border: var(--color-neutral-200);
+
+  /* 
+   * 2. Typography 
+   */
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+
+  /* 
+   * 3. Spacing & Radius 
+   */
+  --radius-xs: 0.125rem;   /* 2px */
+  --radius-sm: 0.25rem;    /* 4px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  --radius-3xl: 2rem;      /* 32px */
   
-  --radius-lg: 12px;
-  --radius-md: 8px;
-  --radius-sm: 4px;
-  
-  --animate-fade-in: fade-in 0.2s ease-out;
-  --animate-slide-up: slide-up 0.3s ease-out;
+  /* 
+   * 4. Effects 
+   */
+  --shadow-glow-primary: 0 0 20px -5px var(--color-primary-400);
+  --shadow-glow-secondary: 0 0 20px -5px var(--color-secondary-400);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* 
+   * 5. Animations 
+   */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  --animate-fade-in: fade-in 0.3s var(--ease-default);
+  --animate-slide-up: slide-up 0.4s var(--ease-spring);
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-:root {
-  color-scheme: light;
-}
-
+/* Custom Keyframes */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -31,18 +118,57 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* Base Configuration */
+:root {
+  color-scheme: light;
+  --glass-blur: 12px;
+  --glass-opacity: 0.8;
+  --glass-border-opacity: 0.5;
+}
+
 body {
   margin: 0;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--color-background);
   color: var(--color-surface-foreground);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Utilities */
+/* 
+ * 6. Utility Classes 
+ */
+
+/* Glassmorphism Panel */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, var(--glass-opacity));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-opacity));
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03),
+    inset 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Reduced Motion: Global Animation Degradation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Safe Area Utilities */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.h-safe-screen {
+  height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }

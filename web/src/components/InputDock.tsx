@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Mic, Settings, XCircle } from 'lucide-react';
 import { useSessionStore } from '@/lib/store/sessionStore';
@@ -120,11 +120,12 @@ function extractApiErrorMessage(error: unknown, fallback: string): string {
 export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [inputValue, setInputValue] = useState('');
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   
   const sessionId = useSessionStore((state) => state.sessionId);
   const addMessage = useSessionStore((state) => state.addMessage);
   
-  const { stage, error: pipelineError, setStage, setError } = usePipelineStore();
+  const { stage, error: pipelineError, setStage, setError, setLipSyncEnergy } = usePipelineStore();
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -132,6 +133,119 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const isStoppingRef = useRef(false);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const lipSyncRafRef = useRef<number | null>(null);
+  const lipSyncContextRef = useRef<AudioContext | null>(null);
+  const lipSyncAnalyserRef = useRef<AnalyserNode | null>(null);
+  const lipSyncSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopLipSyncTracking = useCallback(() => {
+    if (lipSyncRafRef.current !== null) {
+      window.cancelAnimationFrame(lipSyncRafRef.current);
+      lipSyncRafRef.current = null;
+    }
+
+    if (lipSyncSourceRef.current) {
+      lipSyncSourceRef.current.disconnect();
+      lipSyncSourceRef.current = null;
+    }
+
+    if (lipSyncAnalyserRef.current) {
+      lipSyncAnalyserRef.current.disconnect();
+      lipSyncAnalyserRef.current = null;
+    }
+
+    const context = lipSyncContextRef.current;
+    lipSyncContextRef.current = null;
+    if (context && context.state !== 'closed') {
+      void context.close().catch((closeError: unknown) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[InputDock] close audio context failed:', closeError);
+        }
+      });
+    }
+
+    setLipSyncEnergy(0);
+  }, [setLipSyncEnergy]);
+
+  const stopPlaybackAndLipSync = useCallback((pauseAudio = true) => {
+    const activeAudio = audioPlayerRef.current;
+    if (activeAudio) {
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+      if (pauseAudio) {
+        activeAudio.pause();
+      }
+      audioPlayerRef.current = null;
+    }
+    stopLipSyncTracking();
+  }, [stopLipSyncTracking]);
+
+  const startLipSyncTracking = useCallback((audio: HTMLAudioElement) => {
+    const AudioContextCtor = window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
+    if (!AudioContextCtor) {
+      setLipSyncEnergy(0);
+      return;
+    }
+
+    stopLipSyncTracking();
+
+    try {
+      const context = new AudioContextCtor();
+      const source = context.createMediaElementSource(audio);
+      const analyser = context.createAnalyser();
+
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.82;
+
+      source.connect(analyser);
+      analyser.connect(context.destination);
+
+      lipSyncContextRef.current = context;
+      lipSyncSourceRef.current = source;
+      lipSyncAnalyserRef.current = analyser;
+
+      if (context.state === 'suspended') {
+        void context.resume();
+      }
+
+      const timeDomainData = new Uint8Array(analyser.fftSize);
+      const tick = () => {
+        if (!lipSyncAnalyserRef.current) {
+          return;
+        }
+
+        lipSyncAnalyserRef.current.getByteTimeDomainData(timeDomainData);
+
+        let sumSquares = 0;
+        for (let index = 0; index < timeDomainData.length; index += 1) {
+          const normalized = (timeDomainData[index] - 128) / 128;
+          sumSquares += normalized * normalized;
+        }
+
+        const rms = Math.sqrt(sumSquares / timeDomainData.length);
+        const normalizedEnergy = Math.min(Math.max(rms * 3, 0), 1);
+        setLipSyncEnergy(normalizedEnergy);
+
+        lipSyncRafRef.current = window.requestAnimationFrame(tick);
+      };
+
+      lipSyncRafRef.current = window.requestAnimationFrame(tick);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[InputDock] init lip sync analyser failed:', error);
+      }
+      stopLipSyncTracking();
+    }
+  }, [setLipSyncEnergy, stopLipSyncTracking]);
+
+  useEffect(() => () => {
+    stopPlaybackAndLipSync();
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+  }, [stopPlaybackAndLipSync]);
+
+  const touchStartY = useRef<number | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   // Handlers
   const handleSendText = useCallback(async () => {
@@ -139,6 +253,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     
     const textToSend = inputValue.trim();
     setInputValue('');
+    stopPlaybackAndLipSync();
 
     // Add user message immediately (Optimistic)
     addMessage({
@@ -171,7 +286,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, setStage, setError, sessionId]);
+  }, [inputValue, addMessage, setStage, setError, sessionId, stopPlaybackAndLipSync]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -183,6 +298,8 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   // Recording Logic (Press to Talk)
   const startRecording = useCallback(async () => {
     if (isRecordingLocal) return;
+    stopPlaybackAndLipSync();
+    setIsCanceling(false);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -209,26 +326,44 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       mediaRecorder.start();
       recordStartAtRef.current = Date.now();
       setIsRecordingLocal(true);
+      setRecordingDuration(0);
       setStage('recording');
+
+      // Start timer
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 0.1);
+      }, 100);
+
     } catch (err) {
       console.error("Mic permission denied", err);
       alert("请允许麦克风权限以使用语音功能");
       setStage('idle');
     }
-  }, [isRecordingLocal, setStage]);
+  }, [isRecordingLocal, setStage, stopPlaybackAndLipSync]);
 
   const stopRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
     
+    // Clear timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
     const recorder = mediaRecorderRef.current;
     if (isStoppingRef.current || recorder.state !== 'recording') return;
     isStoppingRef.current = true;
     
     recorder.onstop = async () => {
       try {
+        // Check if canceled or too short
         const durationMs = Date.now() - recordStartAtRef.current;
-        if (durationMs < 250) {
-          throw new Error('按住时间太短，请至少按住 0.3 秒');
+        if (isCanceling || durationMs < 500) {
+          setIsRecordingLocal(false);
+          setStage('idle');
+          // Cleanup
+          mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+          return;
         }
 
         const sourceBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
@@ -268,21 +403,28 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         // Handle TTS
         if (response.tts_audio_base64) {
           setStage('speaking');
-          if (audioPlayerRef.current) {
-            audioPlayerRef.current.pause();
-          }
-          
+          stopPlaybackAndLipSync(true);
+
           const audio = new Audio(`data:audio/wav;base64,${response.tts_audio_base64}`);
           audioPlayerRef.current = audio;
           
-          audio.onended = () => setStage('idle');
+          audio.onended = () => {
+            stopPlaybackAndLipSync(false);
+            setStage('idle');
+          };
           audio.onerror = () => {
              console.error("Audio playback error");
+             stopPlaybackAndLipSync(false);
              setStage('idle');
           };
           
-          await audio.play().catch(e => {
+          await audio.play().then(() => {
+            if (audioPlayerRef.current === audio) {
+              startLipSyncTracking(audio);
+            }
+          }).catch(e => {
             console.error("Auto-play blocked:", e);
+            stopPlaybackAndLipSync(false);
             setStage('idle');
           });
         } else {
@@ -296,6 +438,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         
       } catch (err) {
         console.error("Voice Chat Error:", err);
+        stopPlaybackAndLipSync();
         setError(extractApiErrorMessage(err, "语音交互失败"));
         setStage('error');
       } finally {
@@ -306,102 +449,200 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         recordStartAtRef.current = 0;
         isStoppingRef.current = false;
         setIsRecordingLocal(false);
+        setIsCanceling(false);
       }
     };
 
     recorder.requestData();
     recorder.stop();
-  }, [isRecordingLocal, sessionId, setStage, setError, addMessage]);
+  }, [isRecordingLocal, sessionId, setStage, setError, addMessage, stopPlaybackAndLipSync, startLipSyncTracking, isCanceling]);
+
+  const cancelRecording = useCallback(() => {
+    if (!isRecordingLocal || !mediaRecorderRef.current) return;
+     if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    const recorder = mediaRecorderRef.current;
+    isStoppingRef.current = true;
+    recorder.stop(); // This triggers onstop, where we handle cleanup based on isCanceling flag or we can just cleanup here
+    
+    // We can rely on onstop to handle cleanup if we set isCanceling to true before calling stop (which we do in handleTouchMove/End)
+    // But let's be explicit here just in case
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    recordStartAtRef.current = 0;
+    isStoppingRef.current = false;
+    setIsRecordingLocal(false);
+    setStage('idle');
+    setIsCanceling(false);
+  }, [isRecordingLocal, setStage]);
+
+  // Touch handlers for swipe-to-cancel
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault(); // Prevent scroll/selection
+    touchStartY.current = e.touches[0].clientY;
+    startRecording();
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current !== null && isRecordingLocal) {
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - touchStartY.current;
+      
+      // If swiped up by more than 50px
+      if (deltaY < -50) {
+        setIsCanceling(true);
+      } else {
+        setIsCanceling(false);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (isCanceling) {
+      cancelRecording();
+    } else {
+      stopRecording();
+    }
+    touchStartY.current = null;
+    setIsCanceling(false);
+  };
 
   return (
-    <div className="w-full bg-white border-t border-gray-100 p-3 pb-safe-area-bottom">
+    <div className={cn(
+      "relative w-full",
+      "pb-[env(safe-area-inset-bottom)] transition-all duration-300",
+      (stage === 'processing' || stage === 'uploading') && "opacity-80 pointer-events-none grayscale-[0.2]"
+    )}>
       {/* Pipeline Error Display */}
       {stage === 'error' && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-red-50 p-2 text-xs text-red-600">
-          <span>{pipelineError || '连接错误，请重试。'}</span>
-          <button
-            onClick={() => {
-              setError(null);
-              setStage('idle');
-            }}
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
+        <div className="absolute -top-10 left-4 right-4 animate-slide-up">
+           <div className="flex items-center justify-between rounded-lg bg-red-50/90 backdrop-blur-md p-2 text-xs text-red-600 shadow-sm border border-red-100">
+            <span>{pipelineError || '连接错误，请重试。'}</span>
+            <button
+              onClick={() => {
+                setError(null);
+                setStage('idle');
+              }}
+              className="p-1 hover:bg-red-100 rounded-full"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        {/* Settings / Menu Button */}
+      {/* Main Dock Content */}
+      <div className="flex items-center gap-3 p-4">
+        {/* Settings Button */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="shrink-0 text-gray-400 hover:text-gray-600"
+          className="shrink-0 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/50 rounded-full w-10 h-10"
           onClick={onOpenSettings}
         >
           <Settings className="w-5 h-5" />
         </Button>
 
-        {/* Input Area */}
-        <div className="relative flex-1">
+        {/* Input Field */}
+        <div className="relative flex-1 group">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isRecordingLocal ? "正在录音..." : "输入消息..."}
+            placeholder={isRecordingLocal ? "正在聆听..." : "输入消息或按住说话..."}
             className={cn(
-              "pr-10 transition-all duration-200",
-              isRecordingLocal && "bg-red-50 border-red-200 placeholder:text-red-500"
+              "h-12 px-6 py-3 rounded-full text-sm transition-all duration-300",
+              "bg-white/50 border-transparent hover:bg-white/80",
+              "focus:ring-2 focus:ring-primary-400 focus:bg-white",
+              "placeholder:text-neutral-400",
+              isRecordingLocal && "opacity-50 pointer-events-none"
             )}
             disabled={isRecordingLocal || stage === 'processing' || stage === 'uploading'}
           />
         </div>
 
-        {/* Mic / Send Action Button */}
-        {inputValue.trim() ? (
-          <Button 
-            onClick={handleSendText}
-            variant="primary" 
-            size="icon"
-            className="shrink-0 rounded-full"
-            disabled={stage === 'processing' || stage === 'uploading'}
-          >
-            <Send className="w-5 h-5" />
-          </Button>
-        ) : (
-          <Button
-            variant={isRecordingLocal ? "danger" : "secondary"}
-            size="icon"
-            className={cn(
-              "shrink-0 rounded-full transition-all duration-200",
-              isRecordingLocal && "scale-110 shadow-md ring-4 ring-red-100"
-            )}
-            // Mouse Events
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onMouseLeave={stopRecording}
-            // Touch Events (Mobile)
-            onTouchStart={(e) => {
-              e.preventDefault(); // Prevent scroll/click
-              startRecording();
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              stopRecording();
-            }}
-          >
-            <Mic className={cn("w-5 h-5", isRecordingLocal && "animate-pulse")} />
-          </Button>
-        )}
+        {/* Action Buttons Container */}
+        <div className="relative flex items-center justify-center w-12 h-12 shrink-0">
+          {inputValue.trim() ? (
+            /* Send Button */
+            <Button 
+              onClick={handleSendText}
+              className={cn(
+                "absolute inset-0 w-12 h-12 rounded-full p-0",
+                "bg-gradient-to-r from-primary-400 to-primary-600",
+                "text-white shadow-lg shadow-primary-500/30",
+                "hover:scale-105 hover:shadow-xl hover:shadow-primary-500/40",
+                "active:scale-95 transition-all duration-300",
+                "animate-fade-in"
+              )}
+              disabled={stage === 'processing' || stage === 'uploading'}
+            >
+              <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
+            </Button>
+          ) : (
+            /* Record Button */
+            <Button
+              variant="ghost"
+              className={cn(
+                "absolute inset-0 w-12 h-12 rounded-full p-0 transition-all duration-300",
+                isRecordingLocal 
+                  ? "bg-red-50 text-red-500 ring-4 ring-red-100 scale-110 z-10" 
+                  : "bg-transparent text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/50"
+              )}
+              // Mouse Events
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={cancelRecording} // Dragging out cancels
+              // Touch Events
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {isRecordingLocal ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                   <div className={cn(
+                     "absolute inset-0 rounded-full border-2 border-red-500 animate-ping opacity-20",
+                     isCanceling && "border-red-600 opacity-40 scale-125 duration-75"
+                   )}></div>
+                   <Mic className={cn(
+                     "w-6 h-6 animate-pulse",
+                     isCanceling && "text-red-600 scale-110"
+                   )} />
+                </div>
+              ) : (
+                <Mic className="w-6 h-6" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
       
-      {/* Recording Hint */}
-      <div className="mt-1 h-4 text-center">
-        {isRecordingLocal && (
-          <span className="text-[10px] text-red-500 font-medium animate-pulse">
-            松开结束 • 上滑取消
-          </span>
-        )}
-      </div>
+      {/* Recording Overlay/Hints */}
+      {isRecordingLocal && (
+        <div className="absolute bottom-full left-0 right-0 pb-4 flex flex-col items-center justify-end pointer-events-none animate-slide-up">
+           {/* Timer Bubble */}
+           <div className={cn(
+             "bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg mb-2 flex items-center gap-2 transition-all",
+             isCanceling && "bg-red-600 scale-110"
+           )}>
+             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+             {recordingDuration.toFixed(1)}s
+           </div>
+           
+           {/* Cancel Hint */}
+           <div className={cn(
+             "text-xs font-medium tracking-wide transition-colors",
+             isCanceling ? "text-red-500 font-bold" : "text-neutral-400"
+           )}>
+             {isCanceling ? "松开取消" : "上滑取消"}
+           </div>
+        </div>
+      )}
     </div>
   );
 }

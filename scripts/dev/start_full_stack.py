@@ -16,6 +16,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+FORCED_SERVER_PORT = 18000
+FORCED_WEB_API_BASE_URL = f"http://127.0.0.1:{FORCED_SERVER_PORT}"
+
 
 def parse_args() -> argparse.Namespace:
     script_path = Path(__file__).resolve()
@@ -27,9 +30,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sensevoice-root", type=Path, default=Path(r"E:\AI\VTT\SenseVoice"))
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--web-port", type=int, default=3001)
-    parser.add_argument("--server-port", type=int, default=8000)
+    parser.add_argument(
+        "--server-port",
+        type=int,
+        default=FORCED_SERVER_PORT,
+        help=f"已固定为 {FORCED_SERVER_PORT}，传入其他值会被忽略。",
+    )
     parser.add_argument("--sensevoice-port", type=int, default=50000)
     parser.add_argument("--gpt-sovits-port", type=int, default=9880)
+    parser.add_argument(
+        "--web-api-base-url",
+        default="",
+        help=f"已固定为 {FORCED_WEB_API_BASE_URL}，传入其他值会被忽略。",
+    )
+    parser.add_argument(
+        "--server-reload",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="是否以 --reload 模式启动 server（默认开启）。",
+    )
+    parser.add_argument(
+        "--restart-server",
+        action="store_true",
+        help="若 server 端口已占用，先强制结束占用进程再启动。",
+    )
     parser.add_argument("--skip-weights", action="store_true")
     parser.add_argument("--wait-timeout", type=int, default=180)
     parser.add_argument("--dry-run", action="store_true")
@@ -75,6 +99,57 @@ def wait_http_ok(url: str, timeout_seconds: int) -> bool:
     return False
 
 
+def _extract_port(endpoint: str) -> int | None:
+    text = str(endpoint or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def get_listening_pids_on_port(port: int) -> list[int]:
+    try:
+        output = subprocess.check_output(
+            ["netstat", "-ano", "-p", "tcp"],
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    pids: set[int] = set()
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        state = parts[3].upper()
+        if state != "LISTENING":
+            continue
+        parsed_port = _extract_port(parts[1])
+        if parsed_port != port:
+            continue
+        try:
+            pids.add(int(parts[4]))
+        except ValueError:
+            continue
+    return sorted(pids)
+
+
+def kill_process_tree(pid: int, dry_run: bool) -> None:
+    print(f"[kill] taskkill /PID {pid} /F /T")
+    if dry_run:
+        return
+    subprocess.run(
+        ["taskkill", "/PID", str(pid), "/F", "/T"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def launch_in_new_console(pwsh: str, command: str, dry_run: bool) -> None:
     display = f'{pwsh} -NoLogo -NoExit -Command "{command}"'
     print(f"[launch] {display}")
@@ -97,6 +172,17 @@ def run_blocking(pwsh: str, script: Path, args: list[str], dry_run: bool) -> Non
 
 def main() -> int:
     args = parse_args()
+    server_port = FORCED_SERVER_PORT
+    if args.server_port != FORCED_SERVER_PORT:
+        print(
+            f"[warn] --server-port={args.server_port} 已被忽略，统一使用 {FORCED_SERVER_PORT}。"
+        )
+    forced_web_api_base_url = FORCED_WEB_API_BASE_URL
+    input_web_api_base_url = str(args.web_api_base_url or "").strip()
+    if input_web_api_base_url and input_web_api_base_url != forced_web_api_base_url:
+        print(
+            f"[warn] --web-api-base-url={input_web_api_base_url} 已被忽略，统一使用 {forced_web_api_base_url}。"
+        )
     repo_root = args.repo_root.resolve()
     if not repo_root.exists():
         print(f"[error] repo_root 不存在: {repo_root}", file=sys.stderr)
@@ -157,22 +243,52 @@ def main() -> int:
     else:
         run_blocking(pwsh, set_weights, [], args.dry_run)
 
-    if is_port_open("127.0.0.1", args.server_port):
-        print(f"[info] Server 端口 {args.server_port} 已在监听，跳过启动。")
+    server_is_listening = is_port_open("127.0.0.1", server_port) or is_port_open(
+        "0.0.0.0",
+        server_port,
+    )
+    if server_is_listening and args.restart_server:
+        listening_pids = get_listening_pids_on_port(server_port)
+        if listening_pids:
+            print(f"[info] Server 端口 {server_port} 已被占用，准备重启: PIDs={listening_pids}")
+            for pid in listening_pids:
+                kill_process_tree(pid, args.dry_run)
+            if not args.dry_run:
+                time.sleep(1.0)
+        server_is_listening = is_port_open("127.0.0.1", server_port) or is_port_open(
+            "0.0.0.0",
+            server_port,
+        )
+        if server_is_listening:
+            print(f"[error] Server 端口 {server_port} 仍被占用，无法重启。", file=sys.stderr)
+            return 1
+
+    if server_is_listening:
+        print(f"[info] Server 端口 {server_port} 已在监听，跳过启动。")
     else:
-        command = f"Set-Location {repo_ps}; & {ps_quote(str(start_server))}"
+        reload_literal = "$true" if args.server_reload else "$false"
+        command = (
+            f"Set-Location {repo_ps}; "
+            f"& {ps_quote(str(start_server))} -Port {server_port} -Reload:{reload_literal}"
+        )
         launch_in_new_console(pwsh, command, args.dry_run)
 
     if is_port_open("127.0.0.1", args.web_port):
-        print(f"[info] Web 端口 {args.web_port} 已在监听，跳过启动。")
+        print(
+            f"[info] Web 端口 {args.web_port} 已在监听，跳过启动。"
+            f" 如需切换 API 到 {forced_web_api_base_url}，请先重启 Web。"
+        )
     else:
-        command = f"Set-Location {repo_ps}; & {ps_quote(str(start_web))} -Port {args.web_port}"
+        command = (
+            f"Set-Location {repo_ps}; "
+            f"& {ps_quote(str(start_web))} -Port {args.web_port} -ApiBaseUrl {ps_quote(forced_web_api_base_url)}"
+        )
         launch_in_new_console(pwsh, command, args.dry_run)
 
     print("[done] 启动流程已执行。")
     print(
         f"[hint] 预期地址：Web=http://localhost:{args.web_port} "
-        f"Server=http://127.0.0.1:{args.server_port} "
+        f"Server=http://127.0.0.1:{server_port} "
         f"SenseVoice=http://127.0.0.1:{args.sensevoice_port} "
         f"GPT-SoVITS=http://127.0.0.1:{args.gpt_sovits_port}"
     )

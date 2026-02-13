@@ -17,7 +17,13 @@ class PersonaPromptContext:
     description: str
     personality: str
     scenario: str
+    first_message: str
+    mes_example: str
+    character_book: str
     system_prompt: str
+    ai_initial_injection: str
+    ai_additional_info: str
+    ai_need_to_follow: str
 
 
 def load_persona_prompt_context(persona_id: str) -> PersonaPromptContext | None:
@@ -165,7 +171,28 @@ def _load_context_from_card(card_path: Path, persona_id: str) -> PersonaPromptCo
     description = _clip_text(_first_text(card_data.get("description"), payload.get("description")))
     personality = _clip_text(_first_text(card_data.get("personality"), payload.get("personality")))
     scenario = _clip_text(_first_text(card_data.get("scenario"), payload.get("scenario")))
+    first_message = _clip_text(
+        _first_text(card_data.get("first_mes"), payload.get("first_mes")),
+        2000,
+    )
+    mes_example = _clip_prompt_blob(
+        _first_prompt_blob(card_data.get("mes_example"), payload.get("mes_example")),
+        6000,
+    )
+    character_book = _clip_prompt_blob(
+        _first_prompt_blob(card_data.get("character_book"), payload.get("character_book")),
+        9000,
+    )
     system_prompt = _clip_text(_first_text(card_data.get("system_prompt"), payload.get("system_prompt")), 2200)
+    ai_initial_injection = _clip_prompt_blob(
+        _first_prompt_blob(card_data.get("AI_initial_injection"), payload.get("AI_initial_injection"))
+    )
+    ai_additional_info = _clip_prompt_blob(
+        _first_prompt_blob(card_data.get("AI_additional_info"), payload.get("AI_additional_info"))
+    )
+    ai_need_to_follow = _clip_prompt_blob(
+        _first_prompt_blob(card_data.get("AI_need_to_follow"), payload.get("AI_need_to_follow"))
+    )
 
     return PersonaPromptContext(
         persona_id=persona_id,
@@ -173,7 +200,13 @@ def _load_context_from_card(card_path: Path, persona_id: str) -> PersonaPromptCo
         description=description,
         personality=personality,
         scenario=scenario,
+        first_message=first_message,
+        mes_example=mes_example,
+        character_book=character_book,
         system_prompt=system_prompt,
+        ai_initial_injection=ai_initial_injection,
+        ai_additional_info=ai_additional_info,
+        ai_need_to_follow=ai_need_to_follow,
     )
 
 
@@ -185,8 +218,33 @@ def _first_text(*values: object) -> str:
     return ""
 
 
+def _first_prompt_blob(*values: object) -> str:
+    for value in values:
+        text = _prompt_blob_text(value)
+        if text:
+            return text
+    return ""
+
+
+def _prompt_blob_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value).strip()
+
+
 def _clip_text(text: str, max_length: int = 1200) -> str:
     normalized = " ".join(text.split())
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[: max_length - 1].rstrip() + "…"
+
+
+def _clip_prompt_blob(text: str, max_length: int = 10000) -> str:
+    normalized = str(text or "").strip()
     if len(normalized) <= max_length:
         return normalized
     return normalized[: max_length - 1].rstrip() + "…"

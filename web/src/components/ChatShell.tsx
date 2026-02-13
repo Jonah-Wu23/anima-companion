@@ -5,7 +5,7 @@ export function ChatShell({ children, className }: { children: React.ReactNode; 
   return (
     <div 
       className={cn(
-        "relative flex flex-col w-full h-[100dvh] overflow-hidden bg-gray-50 text-slate-900",
+        "relative flex w-full h-[100dvh] overflow-hidden bg-gray-50 text-slate-900",
         className
       )}
     >

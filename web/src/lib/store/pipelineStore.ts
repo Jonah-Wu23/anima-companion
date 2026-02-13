@@ -22,7 +22,14 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   avatarAnimation: 'idle',
   lipSyncEnergy: 0,
 
-  setStage: (stage) => set({ stage }),
+  setStage: (stage) =>
+    set((state) => {
+      if (process.env.NODE_ENV === 'development' && state.stage !== stage) {
+        // 开发期最小状态流转日志，便于快速确认主链路与恢复链路。
+        console.debug(`[pipeline] ${state.stage} -> ${stage}`);
+      }
+      return { stage };
+    }),
   setError: (error) => set({ error }),
   setAvatarAnimation: (anim) => set({ avatarAnimation: anim }),
   setLipSyncEnergy: (energy) => set({ lipSyncEnergy: energy }),

@@ -7,6 +7,7 @@ Thumbs.db
 .vscode/
 .trae/
 .github/
+opencode.json
 *.iml
 
 # Logs
@@ -48,3 +49,11 @@ web/.next/cache/
 
 # next
 web/.next/
+
+# Referances
+ai_virtual_mate_web/
+docs/mmd_download/
+
+# Models
+assets/models/
+assets/motions/phainon/raw/
