@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, MonitorPlay, Trash2, AlertTriangle, Info, Settings2 } from 'lucide-react';
+import { Volume2, MonitorPlay, Trash2, AlertTriangle, Info, Settings2, Crown } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -21,8 +21,10 @@ export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
   const { 
     autoPlayVoice, 
     reducedMotion, 
-    toggleAutoPlay, 
-    toggleReducedMotion 
+    vipModeEnabled,
+    toggleAutoPlay,
+    toggleReducedMotion,
+    toggleVipMode
   } = useSettingsStore();
   
   const { clearSession } = useSessionStore();
@@ -63,6 +65,19 @@ export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
                         语音与交互
                     </h3>
                     <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-2 border border-white/40 shadow-sm">
+                        {/* 选项：VIP 模式 */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-100/50 last:border-0">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2.5 bg-amber-100/80 text-amber-600 rounded-2xl">
+                                    <Crown className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-slate-700">VIP 模式</div>
+                                    <div className="text-xs text-slate-500 mt-0.5">解锁语音输入与文字转语音回复</div>
+                                </div>
+                            </div>
+                            <Switch checked={vipModeEnabled} onCheckedChange={toggleVipMode} />
+                        </div>
                         
                         {/* 选项：自动播放 */}
                         <div className="flex items-center justify-between p-4 border-b border-gray-100/50 last:border-0">

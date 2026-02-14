@@ -19,6 +19,7 @@ logs/
 .env.*
 !.env.example
 secrets/
+config.yaml
 
 # Python
 __pycache__/

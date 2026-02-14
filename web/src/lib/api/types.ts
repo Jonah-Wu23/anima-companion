@@ -50,6 +50,12 @@ export interface ChatTextResponse {
   memory_writes: MemoryWrite[];
 }
 
+export interface ChatTextVoiceResponse extends ChatTextResponse {
+  tts_media_type: string;
+  tts_audio_base64: string;
+  tts_error?: string | null;
+}
+
 export interface ChatVoiceResponse {
   transcript_text: string;
   assistant_text: string;

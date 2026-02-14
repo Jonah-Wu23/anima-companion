@@ -38,6 +38,12 @@ class ChatTextResponse(BaseModel):
     memory_writes: list[MemoryWrite] = Field(default_factory=list)
 
 
+class ChatTextVoiceResponse(ChatTextResponse):
+    tts_media_type: str
+    tts_audio_base64: str
+    tts_error: str | None = None
+
+
 class ChatVoiceResponse(BaseModel):
     transcript_text: str
     assistant_text: str

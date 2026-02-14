@@ -24,6 +24,7 @@ export class MMDAnimationManager {
   private readonly lipSync: LipSyncController;
   private readonly mixer: THREE.AnimationMixer;
   private currentActionName: string | null = null;
+  private disposed = false;
 
   constructor(
     private readonly mesh: THREE.SkinnedMesh,
@@ -105,12 +106,21 @@ export class MMDAnimationManager {
   }
 
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+
     this.stop();
     this.actions.clear();
     this.clips.clear();
     this.clipOptions.clear();
     this.lipSync.reset(true);
-    this.helper.remove(this.mesh);
+
+    const helperObjects = (this.helper as unknown as { objects?: WeakMap<THREE.SkinnedMesh, HelperObject> }).objects;
+    if (helperObjects?.has(this.mesh)) {
+      this.helper.remove(this.mesh);
+    }
   }
 
   getCurrentActionName(): string | null {

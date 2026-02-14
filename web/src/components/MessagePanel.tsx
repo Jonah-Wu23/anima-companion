@@ -1,13 +1,35 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore } from '@/lib/store/pipelineStore';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar';
 import { Sparkles, MessageSquare, Mic, Smile } from 'lucide-react';
+import { api } from '@/lib/api/client';
+
+const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
+
+function extractApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    return error.message || fallback;
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
 
 export function MessagePanel() {
+  const sessionId = useSessionStore((state) => state.sessionId);
   const messages = useSessionStore((state) => state.messages);
+  const addMessage = useSessionStore((state) => state.addMessage);
   const pipelineStage = usePipelineStore((state) => state.stage);
+  const setStage = usePipelineStore((state) => state.setStage);
+  const setError = usePipelineStore((state) => state.setError);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -17,6 +39,39 @@ export function MessagePanel() {
   }, [messages, pipelineStage]);
 
   const isTyping = pipelineStage === 'processing';
+  const isBusy = pipelineStage === 'processing' || pipelineStage === 'uploading' || pipelineStage === 'recording';
+
+  const handleQuickPrompt = useCallback(async (text: string) => {
+    if (!text.trim() || isBusy) return;
+
+    addMessage({
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      createdAt: Date.now(),
+    });
+
+    setStage('processing');
+    try {
+      const response = await api.chatText({
+        session_id: sessionId,
+        persona_id: DEFAULT_PERSONA_ID,
+        user_text: text,
+      });
+
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response.assistant_text,
+        createdAt: Date.now(),
+        emotion: response.emotion,
+      });
+      setStage('idle');
+    } catch (error) {
+      setError(extractApiErrorMessage(error, '发送失败，请重试'));
+      setStage('error');
+    }
+  }, [addMessage, isBusy, sessionId, setError, setStage]);
 
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden bg-transparent">
@@ -50,9 +105,8 @@ export function MessagePanel() {
                 <button
                   key={i}
                   className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 rounded-full text-xs text-slate-600 transition-colors shadow-sm"
-                  onClick={() => {
-                    // Ideally this would trigger an action, but for now it's just UI
-                  }}
+                  onClick={() => void handleQuickPrompt(chip.text)}
+                  disabled={isBusy}
                 >
                   <chip.icon className="w-3 h-3" />
                   {chip.text}

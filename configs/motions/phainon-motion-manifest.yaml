@@ -17,14 +17,19 @@ states:
         risk: "low"
   Speaking:
     candidates:
-      - asset_id: "phainon_bg_loop_chat_003"
-        path: "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk1-east-謝.vmd"
+      - asset_id: "phainon_bg_loop_chat_001"
+        path: "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/öwîiâLâââëùpâïü[âvë∩ÿbâéü[âVâçâô/xs-talk6-east-ë/.vmd"
         priority: 1
+        fallback: false
+        risk: "medium"
+      - asset_id: "phainon_bg_loop_chat_015"
+        path: "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk8-east-渉.vmd"
+        priority: 2
         fallback: false
         risk: "medium"
       - asset_id: "phainon_ot0510_standby_009"
         path: "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_元気_まばたき付き.vmd"
-        priority: 2
+        priority: 3
         fallback: true
         risk: "low"
   Listening:

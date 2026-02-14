@@ -3,12 +3,18 @@ import axios from 'axios';
 import { Send, Mic, Settings, XCircle } from 'lucide-react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore } from '@/lib/store/pipelineStore';
+import { useSettingsStore } from '@/lib/store/settingsStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import VipModal from '@/components/VipModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
+import type { ChatTextVoiceResponse } from '@/lib/api/types';
 
-type WebkitWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
+type WebkitWindow = Window & typeof globalThis & {
+  webkitAudioContext?: typeof AudioContext;
+  __testLipSync?: (energy?: number) => number;
+};
 const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
 
 function mergeToMono(audioBuffer: AudioBuffer): Float32Array {
@@ -121,9 +127,13 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [inputValue, setInputValue] = useState('');
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isVipModalOpen, setIsVipModalOpen] = useState(false);
   
   const sessionId = useSessionStore((state) => state.sessionId);
   const addMessage = useSessionStore((state) => state.addMessage);
+  const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
+  const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
+  const enableVipMode = useSettingsStore((state) => state.enableVipMode);
   
   const { stage, error: pipelineError, setStage, setError, setLipSyncEnergy } = usePipelineStore();
   
@@ -239,6 +249,35 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     }
   }, [setLipSyncEnergy, stopLipSyncTracking]);
 
+  const playAssistantAudioBase64 = useCallback(async (audioBase64: string) => {
+    setStage('speaking');
+    stopPlaybackAndLipSync(true);
+
+    const audio = new Audio(`data:audio/wav;base64,${audioBase64}`);
+    audioPlayerRef.current = audio;
+
+    audio.onended = () => {
+      stopPlaybackAndLipSync(false);
+      setStage('idle');
+    };
+    audio.onerror = () => {
+      console.error("Audio playback error");
+      stopPlaybackAndLipSync(false);
+      setStage('idle');
+    };
+
+    try {
+      await audio.play();
+      if (audioPlayerRef.current === audio) {
+        startLipSyncTracking(audio);
+      }
+    } catch (error) {
+      console.error("Auto-play blocked:", error);
+      stopPlaybackAndLipSync(false);
+      setStage('idle');
+    }
+  }, [setStage, startLipSyncTracking, stopPlaybackAndLipSync]);
+
   useEffect(() => () => {
     stopPlaybackAndLipSync();
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -246,6 +285,32 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
 
   const touchStartY = useRef<number | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
+
+  const requireVipOrPrompt = useCallback((): boolean => {
+    if (vipModeEnabled) {
+      return true;
+    }
+    setIsVipModalOpen(true);
+    return false;
+  }, [vipModeEnabled]);
+
+  const handleActivateVip = useCallback(() => {
+    enableVipMode();
+    setIsVipModalOpen(false);
+  }, [enableVipMode]);
+
+  useEffect(() => {
+    const globalWindow = window as WebkitWindow;
+    globalWindow.__testLipSync = (energy = 0) => {
+      const safeEnergy = Math.max(0, Math.min(1, Number.isFinite(energy) ? energy : 0));
+      setLipSyncEnergy(safeEnergy);
+      return safeEnergy;
+    };
+
+    return () => {
+      delete globalWindow.__testLipSync;
+    };
+  }, [setLipSyncEnergy]);
 
   // Handlers
   const handleSendText = useCallback(async () => {
@@ -266,11 +331,18 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     setStage('processing');
 
     try {
-      const response = await api.chatText({
-        session_id: sessionId,
-        persona_id: DEFAULT_PERSONA_ID,
-        user_text: textToSend
-      });
+      const canUseVipVoice = autoPlayVoice && vipModeEnabled;
+      const response = canUseVipVoice
+        ? await api.chatTextWithVoice({
+            session_id: sessionId,
+            persona_id: DEFAULT_PERSONA_ID,
+            user_text: textToSend
+          })
+        : await api.chatText({
+            session_id: sessionId,
+            persona_id: DEFAULT_PERSONA_ID,
+            user_text: textToSend
+          });
 
       addMessage({
         id: crypto.randomUUID(),
@@ -279,14 +351,31 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         createdAt: Date.now(),
         emotion: response.emotion
       });
-      
+
+      if (autoPlayVoice && !vipModeEnabled) {
+        setIsVipModalOpen(true);
+      }
+
+      if (canUseVipVoice) {
+        const voiceResponse = response as ChatTextVoiceResponse;
+        if (voiceResponse.tts_audio_base64) {
+          await playAssistantAudioBase64(voiceResponse.tts_audio_base64);
+          return;
+        }
+        if (voiceResponse.tts_error) {
+          setError(`语音合成未成功：${voiceResponse.tts_error}`);
+          setStage('error');
+          return;
+        }
+      }
+
       setStage('idle');
     } catch (err) {
       console.error("Chat Text Error:", err);
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, setStage, setError, sessionId, stopPlaybackAndLipSync]);
+  }, [inputValue, addMessage, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -298,6 +387,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   // Recording Logic (Press to Talk)
   const startRecording = useCallback(async () => {
     if (isRecordingLocal) return;
+    if (!requireVipOrPrompt()) return;
     stopPlaybackAndLipSync();
     setIsCanceling(false);
 
@@ -339,7 +429,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       alert("请允许麦克风权限以使用语音功能");
       setStage('idle');
     }
-  }, [isRecordingLocal, setStage, stopPlaybackAndLipSync]);
+  }, [isRecordingLocal, requireVipOrPrompt, setStage, stopPlaybackAndLipSync]);
 
   const stopRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
@@ -402,31 +492,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         
         // Handle TTS
         if (response.tts_audio_base64) {
-          setStage('speaking');
-          stopPlaybackAndLipSync(true);
-
-          const audio = new Audio(`data:audio/wav;base64,${response.tts_audio_base64}`);
-          audioPlayerRef.current = audio;
-          
-          audio.onended = () => {
-            stopPlaybackAndLipSync(false);
-            setStage('idle');
-          };
-          audio.onerror = () => {
-             console.error("Audio playback error");
-             stopPlaybackAndLipSync(false);
-             setStage('idle');
-          };
-          
-          await audio.play().then(() => {
-            if (audioPlayerRef.current === audio) {
-              startLipSyncTracking(audio);
-            }
-          }).catch(e => {
-            console.error("Auto-play blocked:", e);
-            stopPlaybackAndLipSync(false);
-            setStage('idle');
-          });
+          await playAssistantAudioBase64(response.tts_audio_base64);
         } else {
           if (response.tts_error) {
             setError(`语音合成未成功：${response.tts_error}`);
@@ -455,7 +521,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
 
     recorder.requestData();
     recorder.stop();
-  }, [isRecordingLocal, sessionId, setStage, setError, addMessage, stopPlaybackAndLipSync, startLipSyncTracking, isCanceling]);
+  }, [isRecordingLocal, sessionId, setStage, setError, addMessage, stopPlaybackAndLipSync, isCanceling, playAssistantAudioBase64]);
 
   const cancelRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
@@ -513,31 +579,32 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   };
 
   return (
-    <div className={cn(
-      "relative w-full",
-      "pb-[env(safe-area-inset-bottom)] transition-all duration-300",
-      (stage === 'processing' || stage === 'uploading') && "opacity-80 pointer-events-none grayscale-[0.2]"
-    )}>
-      {/* Pipeline Error Display */}
-      {stage === 'error' && (
-        <div className="absolute -top-10 left-4 right-4 animate-slide-up">
-           <div className="flex items-center justify-between rounded-lg bg-red-50/90 backdrop-blur-md p-2 text-xs text-red-600 shadow-sm border border-red-100">
-            <span>{pipelineError || '连接错误，请重试。'}</span>
-            <button
-              onClick={() => {
-                setError(null);
-                setStage('idle');
-              }}
-              className="p-1 hover:bg-red-100 rounded-full"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
+    <>
+      <div className={cn(
+        "relative w-full",
+        "pb-[env(safe-area-inset-bottom)] transition-all duration-300",
+        (stage === 'processing' || stage === 'uploading') && "opacity-80 pointer-events-none grayscale-[0.2]"
+      )}>
+        {/* Pipeline Error Display */}
+        {stage === 'error' && (
+          <div className="absolute -top-10 left-4 right-4 animate-slide-up">
+             <div className="flex items-center justify-between rounded-lg bg-red-50/90 backdrop-blur-md p-2 text-xs text-red-600 shadow-sm border border-red-100">
+              <span>{pipelineError || '连接错误，请重试。'}</span>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setStage('idle');
+                }}
+                className="p-1 hover:bg-red-100 rounded-full"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Main Dock Content */}
-      <div className="flex items-center gap-3 p-4">
+        {/* Main Dock Content */}
+        <div className="flex items-center gap-3 p-4">
         {/* Settings Button */}
         <Button 
           variant="ghost" 
@@ -620,29 +687,36 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
             </Button>
           )}
         </div>
-      </div>
-      
-      {/* Recording Overlay/Hints */}
-      {isRecordingLocal && (
-        <div className="absolute bottom-full left-0 right-0 pb-4 flex flex-col items-center justify-end pointer-events-none animate-slide-up">
-           {/* Timer Bubble */}
-           <div className={cn(
-             "bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg mb-2 flex items-center gap-2 transition-all",
-             isCanceling && "bg-red-600 scale-110"
-           )}>
-             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-             {recordingDuration.toFixed(1)}s
-           </div>
-           
-           {/* Cancel Hint */}
-           <div className={cn(
-             "text-xs font-medium tracking-wide transition-colors",
-             isCanceling ? "text-red-500 font-bold" : "text-neutral-400"
-           )}>
-             {isCanceling ? "松开取消" : "上滑取消"}
-           </div>
         </div>
-      )}
-    </div>
+      
+        {/* Recording Overlay/Hints */}
+        {isRecordingLocal && (
+          <div className="absolute bottom-full left-0 right-0 pb-4 flex flex-col items-center justify-end pointer-events-none animate-slide-up">
+             {/* Timer Bubble */}
+             <div className={cn(
+               "bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg mb-2 flex items-center gap-2 transition-all",
+               isCanceling && "bg-red-600 scale-110"
+             )}>
+               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+               {recordingDuration.toFixed(1)}s
+             </div>
+             
+             {/* Cancel Hint */}
+             <div className={cn(
+               "text-xs font-medium tracking-wide transition-colors",
+               isCanceling ? "text-red-500 font-bold" : "text-neutral-400"
+             )}>
+               {isCanceling ? "松开取消" : "上滑取消"}
+             </div>
+          </div>
+        )}
+      </div>
+
+      <VipModal
+        isOpen={isVipModalOpen}
+        onClose={() => setIsVipModalOpen(false)}
+        onActivate={handleActivateVip}
+      />
+    </>
   );
 }

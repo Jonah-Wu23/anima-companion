@@ -2,6 +2,7 @@ import axios from 'axios';
 import { 
   ChatTextRequest, 
   ChatTextResponse, 
+  ChatTextVoiceResponse,
   ChatVoiceResponse,
   UserClearRequest,
   UserClearResponse
@@ -21,6 +22,14 @@ export const api = {
   // Chat Text
   chatText: async (payload: ChatTextRequest): Promise<ChatTextResponse> => {
     const { data } = await apiClient.post<ChatTextResponse>('/v1/chat/text', payload);
+    return data;
+  },
+
+  // Chat Text + Voice (VIP)
+  chatTextWithVoice: async (payload: ChatTextRequest): Promise<ChatTextVoiceResponse> => {
+    const { data } = await apiClient.post<ChatTextVoiceResponse>('/v1/chat/text-with-voice', payload, {
+      timeout: 1200000,
+    });
     return data;
   },
 

@@ -19,6 +19,8 @@ const BLENDER_CAMERA_POSITION: [number, number, number] = [-0.004086, -5.34387, 
 const BLENDER_CAMERA_ROTATION_DEG: [number, number, number] = [89.0057, -0.00001, -0.533334];
 const CAMERA_VERTICAL_OFFSET = 0.98;
 const CAMERA_FORWARD_OFFSET = 0.95;
+const TALK8_CAMERA_FORWARD_EXTRA_OFFSET = 0.5;
+const TALK8_MOTION_IDS = new Set(['phainon_bg_loop_chat_015', 'phainon_bg_loop_chat_016']);
 
 // 坐标系转换：Blender(Z-up) -> Three(Y-up)
 const BLENDER_TO_THREE_BASIS = new THREE.Quaternion().setFromEuler(
@@ -182,6 +184,29 @@ function SimpleGrid() {
   );
 }
 
+function CameraPoseController() {
+  const currentMotion = useAvatarStore((state) => state.currentMotion);
+  const targetPositionRef = useRef(
+    new THREE.Vector3(CAMERA_POSITION[0], CAMERA_POSITION[1], CAMERA_POSITION[2])
+  );
+
+  useEffect(() => {
+    const forwardOffset = TALK8_MOTION_IDS.has(currentMotion)
+      ? CAMERA_FORWARD_OFFSET + TALK8_CAMERA_FORWARD_EXTRA_OFFSET
+      : CAMERA_FORWARD_OFFSET;
+    targetPositionRef.current
+      .copy(CAMERA_BASE_POSITION)
+      .addScaledVector(CAMERA_FORWARD, forwardOffset);
+  }, [currentMotion]);
+
+  useFrame(({ camera }) => {
+    camera.position.copy(targetPositionRef.current);
+    camera.quaternion.copy(CAMERA_QUATERNION);
+  });
+
+  return null;
+}
+
 export default function Viewport3D() {
   const modelStatus = useAvatarStore((state) => state.modelStatus);
   const modelProgress = useAvatarStore((state) => state.modelProgress);
@@ -245,6 +270,7 @@ export default function Viewport3D() {
             camera.updateProjectionMatrix();
           }}
         />
+        <CameraPoseController />
         {/* 背景改回淡蓝色 */}
         <color attach="background" args={['#EAF5FF']} />
         {/* 添加淡雾效 */}
