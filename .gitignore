@@ -53,7 +53,7 @@ web/.next/
 
 # Referances
 ai_virtual_mate_web/
-docs/mmd_download/
+mmd_download/
 
 # Models
 assets/models/

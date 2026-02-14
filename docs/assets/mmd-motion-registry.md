@@ -2,7 +2,7 @@
 
 - 默认用途: 内部验证（internal validation only）
 - 校验日期: 2026-02-12
-- 范围: `docs/mmd_download/*.zip` 全量解压到 `assets/motions/phainon/raw/<zip同名目录>/`
+- 范围: `mmd_download/*.zip` 全量解压到 `assets/motions/phainon/raw/<zip同名目录>/`
 
 ## Zip 校验与解压概览
 

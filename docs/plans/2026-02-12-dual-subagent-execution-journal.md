@@ -16,7 +16,7 @@
 
 2. B 轨完成（100%）
 - 创建并填充目录：`assets/motions/phainon/raw`。
-- 全量解压 `docs/mmd_download/*.zip` 到 `raw/<zip同名目录>/`，保留原始压缩包。
+- 全量解压 `mmd_download/*.zip` 到 `raw/<zip同名目录>/`，保留原始压缩包。
 - 生成资产台账：`docs/assets/mmd-motion-registry.md`（含 `asset_id`、来源、路径、格式、预分类、骨骼要求、风险、限制、校验日期、zip 级 SHA256）。
 - 生成状态映射清单：`configs/motions/phainon-motion-manifest.yaml`（每状态至少 1 候选，含 `priority`/`fallback`）。
 - 合规策略落地：`ミニモーション集.zip` 相关条目标记 `high`，并提供替代候选。

@@ -61,16 +61,13 @@ P3 是**"沉浸升级"**阶段，核心目标是将"功能可用"升级为"情�
 
 | 项目 | P2状态 | P3行动 |
 |------|--------|--------|
-| 首次加载时间实测 | ⬜ 未实测 | P3 Phase B前完成基准测试 |
-| 内存占用实测 | ⬜ 未实测 | P3 Phase B前完成基准测试 |
-| 帧率实测 | ⬜ 未实测 | P3 Phase B前完成基准测试 |
 | Morph名称确认 | ✅ 已确认(`あ`) | 无需行动，P3可直接使用 |
 | MMDLoader版本锁定 | ⬜ 待Fork | **P3 Phase A首要任务** |
 | 动作与模型匹配验证 | ✅ 已验证 | 换装系统需重新验证新模型 |
 
 **🔴 P3启动阻塞项**:
-1. **MMDLoader Fork** - 必须最先完成，否则无法升级three.js
-2. **性能基准测试** - 在添加新功能前记录P2性能基线
+1. **模型资产登记（Model Registry）** - 先把“有哪些模型/许可限制/命名规范/加载入口”登记清楚，避免后续换装返工与合规风险
+2. **MMDLoader Fork** - 必须最先完成，否则无法升级three.js
 
 ---
 
@@ -124,40 +121,105 @@ if (material.name === '髪' || material.name === '髪2') {
 ### 1.3 资产现状
 
 - **模型**: `assets/models/Phainon/星穹铁道—白厄3.pmx` + 贴图完整
+- **新增模型**: `assets/models/Phainon_Khaslana_normal/星穹铁道—白厄3.pmx`（换装候选）
+- **换装候选模型（待清点/命名/迁移）**: `mmd_download/models/*`（多套白厄变体 + 1 套卡厄斯兰那）
 - **动作**: 55 个 VMD 动作已整理（5 个 zip 包）
 - **动作清单**: `configs/motions/phainon-motion-manifest.json`
 - **缺失**:
   - 房间场景模型（需创建或采购）
-  - 服装变体（需寻找或制作）
+  - 换装模型清点与合规登记（优先把“可用模型”整理成稳定资产入口）
   - 表情 Morph 映射表（需实测确认）
 
 ---
 
 ## 2. P3 任务拆解
 
-### Phase A：技术债清偿 — MMDLoader Fork（预计 1-2 工作单元）
+### 2.0 执行分工（强视觉AI / 强逻辑AI）
 
-#### A0. P2 性能基准测试
+约定：
+- **强视觉AI**：多模态/图片/视频/画面理解、美术、UI/UX、前端视觉表现、平面设计
+- **强逻辑AI**：强逻辑、后端、算法、工程化重构、性能与资源释放（即使不量化，也要“可靠”）
 
-**目标**：在添加P3新功能前，建立P2性能基线，便于后续对比。
+分工表（按模块拆分，避免“同一任务两种能力混在一起”）：
 
-**测试项**：
+| 模块 | 交付物 | 执行者 |
+|---|---|---|
+| 模型资产登记（Model Registry） | `docs/assets/models/*.md` + 命名规范 | 强逻辑AI |
+| MMDLoader Fork / three.js 升级 | `web/src/lib/vendor/mmd/*` + 回归 | 强逻辑AI |
+| VAD 核心录音与状态机 | `vad-recorder.ts` / `pipelineStore` | 强逻辑AI |
+| VAD Dock 交互与视觉 | `VoiceInputDock.tsx` 交互、动效、文案 | 强视觉AI |
+| 触摸互动的交互设计 | 点击/拖拽/悬停反馈规则与手势 | 强视觉AI |
+| 触摸互动的判定与驱动 | Raycast / 命中区域 / 触发动作与表情 | 强逻辑AI |
+| 表情“看起来对” | 表情组合、强度曲线、眨眼节奏 | 强视觉AI |
+| 表情“跑得稳” | Morph 映射、blend、与口型/动作联动 | 强逻辑AI |
+| 房间氛围与布景 | GLTF/灯光/材质/构图 | 强视觉AI |
+| 时间/相册数据层 | 事件记录、存储、删除、隐私开关 | 强逻辑AI |
+| 相册 UI/动效 | 版式、动效、可读性 | 强视觉AI |
+| 换装 UI/选择器 | 选衣/预览/加载态 | 强视觉AI |
+| 换装加载/卸载/重绑定 | dispose、贴图缓存、动画重绑 | 强逻辑AI |
 
-| 指标 | 测试方法 | 目标值 | 记录位置 |
-|------|---------|--------|---------|
-| 首次加载时间 | DevTools Network | < 5s (本地) | `docs/performance/baseline-p2.md` |
-| 内存占用 | DevTools Memory | < 200MB | `docs/performance/baseline-p2.md` |
-| 桌面帧率 | DevTools Performance | >= 60 FPS | `docs/performance/baseline-p2.md` |
-| 移动帧率 | DevTools Performance | >= 30 FPS | `docs/performance/baseline-p2.md` |
+### Phase 0：资产合规与登记 — Model Registry（预计 0.5 工作单元）
+
+**主执行**：强逻辑AI
+
+#### P0-1. 参考 Motion Registry 新建 Model Registry
+
+**目标**：参考 `docs/assets/mmd-motion-registry.md` 的风格，为每个模型建立独立的登记文档，明确：
+- 模型的**规范命名**（`assets/models/<dir>/`）
+- 关键文件（PMX/贴图）与校验信息（建议记录 PMX 的 SHA256）
+- 作者/来源/许可条款摘要（禁止事项必须可见）
+- 在工程中的使用边界（内部验证 vs 发布、可改造范围）
+- **规则**：同一目录内如存在多个可用 PMX（例如“双版本”“faceward”），按**多个模型**登记（可拆成多个 `assets/models/<dir>/`，或在同一 registry 中分别列出并给出独立 `model_id`）
+
+**新增目录**：`docs/assets/models/`
+
+**新增文件（首批）**：
+- `docs/assets/models/README.md`（索引）
+- `docs/assets/models/Phainon.md`
+- `docs/assets/models/Phainon_Khaslana_normal.md`
+- `docs/assets/models/Phainon_Khaslana.md`（从 `mmd_download/models/卡厄斯兰那_1109_by_FixEll_fe82a555dc5f6cda5c26676ae7c905ef/` 迁移并规范命名）
+
+**扩展要求**：
+- `mmd_download/models/` 下每个“可用 PMX”都必须有对应的 registry（双版本/faceward 等按多个模型入口处理）。
 
 **验收标准**：
-- [ ] 完成Chrome桌面端测试
-- [ ] 完成Chrome移动端模拟测试
-- [ ] 数据记录到文档
+- [ ] `docs/assets/models/README.md` 索引更新
+- [ ] `mmd_download/models/` 清点完成：每个可用 PMX 均有 registry
+- [ ] 每个模型至少记录 1 个 PMX 的 SHA256（建议同时记录规约文件的 SHA256）
+- [ ] 明确 `assets/models/` 与 `mmd_download/` 均被 `.gitignore` 忽略，仅登记文档进入仓库
 
-**阻塞性**：⚠️ 高 - 必须在Phase B开始前完成，否则无法评估P3性能影响
+#### P0-2. 统一模型目录命名（建议规范）
+
+**目标**：每个可被“换装/切换”的模型，在 `assets/models/` 下都有稳定、可引用的英文目录名。
+
+**命名建议**：
+- 基础白厄：`Phainon`
+- 卡厄斯兰那：`Phainon_Khaslana`
+- 形态/法线版（现有目录）：`Phainon_Khaslana_normal`
+- 其他变体：`Phainon_<VariantSlug>`（例：`Phainon_CaptainUniform`）
+
+**迁移建议（建议映射，可在 P0-1 文档中落地）**：
+
+| 当前来源目录（mmd_download） | 建议规范目录名（assets/models） | 备注 |
+|---|---|---|
+| `白厄 - 粉3_by_苏酥鱼鱼喵_8a3c921bb1aa6bc3dd653945234cfc9e` | `Phainon_Demiurge` | 作品名“德谬歌-白厄” |
+| `白厄 - red_by_苏酥鱼鱼喵_046c10a503037a13b255d917abd307d3` | `Phainon_IronTomb_White` | 作品名“铁墓白”（英文: `Iron` + `Tomb`） |
+| `白厄_by_随着2时间的推移_5b48c63aa4788ffdbbd5193ffd92fdbe` | `Phainon_Agent_White` | “特工白厄”（单独一个 PMX） |
+| `白厄_by_随着2时间的推移_5b48c63aa4788ffdbbd5193ffd92fdbe` | `Phainon_Agent_Black` | “秘密特工黑厄”（单独一个 PMX） |
+| `白厄机长制服_by_林槿_5cd991855e14a10cd3b26a719c5f9f4b` | `Phainon_CaptainUniform` | 机长制服 |
+| `白厄女神（神厄娘化） - by_填字小檀桌_by_填字小檀桌_9b5ffdd0719344792a1b0bc5d40ad29c` | `Phainon_Goddess_NoWings_NoHalo` | 娘化变体（婚纱级别，合规）：无翼无光环 |
+| `白厄女神（神厄娘化） - by_填字小檀桌_by_填字小檀桌_9b5ffdd0719344792a1b0bc5d40ad29c` | `Phainon_Goddess_Wings_Halo` | 娘化变体（婚纱级别，合规）：带翅膀光环 |
+| `白厄女士 - 双版本_by_填字小檀桌_eb9ea4feda74659ebdf82bce6e64aafd` | `Phainon_Lady_Skirt_LongHair` | 双版本之一（按“两个模型”处理） |
+| `白厄女士 - 双版本_by_填字小檀桌_eb9ea4feda74659ebdf82bce6e64aafd` | `Phainon_Lady_Coat_LongHair` | 双版本之二（按“两个模型”处理） |
+| `白厄瑞幸联动_by_林槿_9adae994970c25717b6a1f9cd6df77de` | `Phainon_LuckinCollab` | 联动款 |
+| `白厄anan杂志_by_林槿_19950a785e6ca4ce6af60ddc007d863b` | `Phainon_ANAN_Magazine` | 杂志款 |
+| `卡厄斯兰那_1109_by_FixEll_fe82a555dc5f6cda5c26676ae7c905ef` | `Phainon_Khaslana` | 用户指定命名；需遵守 Credits.txt 的标注与禁止事项 |
 
 ---
+
+### Phase A：技术债清偿 — MMDLoader Fork（预计 1-2 工作单元）
+
+**主执行**：强逻辑AI
 
 #### A1. MMDLoader Vendor 化
 
@@ -191,14 +253,16 @@ web/src/lib/vendor/mmd/
 | `web/tsconfig.json` | 如需要，添加 vendor 目录到编译范围 |
 
 **验收标准**：
-- [ ] `npm run typecheck` 通过
-- [ ] `npm run build` 通过
+- [ ] `npm run typecheck:web` 通过（或 `cd web` 后执行 `npm run typecheck`）
+- [ ] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
 - [ ] MMD 模型加载、动作播放、口型同步功能正常
 - [ ] three.js 可升级到最新版本（如 r173+）
 
 ---
 
 ### Phase B：交互层升级 — VAD 与触摸互动（预计 2-3 工作单元）
+
+**主执行**：强逻辑AI（音频/状态机） + 强视觉AI（交互与视觉）
 
 #### B1. VAD 免按键通话
 
@@ -208,11 +272,11 @@ web/src/lib/vendor/mmd/
 
 **新增文件**：
 
-| 文件路径 | 说明 |
-|---------|------|
-| `web/src/lib/audio/vad-recorder.ts` | VAD 封装，提供开始/停止/回调接口 |
-| `web/src/lib/audio/vad-config.ts` | VAD 配置参数（阈值、缓冲时间等） |
-| `web/src/components/VoiceInputDock.tsx` | 语音输入 Dock（升级自 InputDock） |
+| 文件路径 | 说明 | 执行者 |
+|---------|------|---|
+| `web/src/lib/audio/vad-recorder.ts` | VAD 封装，提供开始/停止/回调接口 | 强逻辑AI |
+| `web/src/lib/audio/vad-config.ts` | VAD 配置参数（阈值、缓冲时间等） | 强逻辑AI |
+| `web/src/components/VoiceInputDock.tsx` | 语音输入 Dock（升级自 InputDock） | 强视觉AI |
 
 **接口设计**：
 
@@ -286,7 +350,7 @@ interface PipelineState {
 | VAD 在中文场景效果差 | 中 | 高 | 可调参数 + 按键模式兜底 |
 | ~~白厄 Morph 名称不规范~~ | ✅ 已解决 | - | P2已确认`あ`可用 |
 | 房间资产找不到合适风格 | 中 | 中 | 程序生成基础房间；后续迭代 |
-| 换装模型难以获取 | **高** | 中 | 社区寻找/委托/延期到P4 |
+| 换装模型许可/归档不清导致不可用 | 中 | 高 | P0 模型登记；只将“许可明确可用”的模型纳入换装候选 |
 | 换装模型骨骼不兼容 | 中 | 高 | 统一骨骼标准；动作重定向 |
 | 换装切换内存泄漏 | 中 | 高 | 严格dispose；内存监控 |
 | 性能下降（房间+表情+物理） | 中 | 高 | 性能监控；分层降级 |
@@ -299,9 +363,9 @@ interface PipelineState {
 ### 8.1 功能验收
 
 - [ ] **A1**: three.js 升级到 r173+，MMD 功能正常
-- [ ] **B1**: VAD 触发准确率 > 90%，支持 VAD/按键/文本三模切换
-- [ ] **B2**: 触摸交互响应延迟 < 100ms，点击头部/身体有反馈
-- [ ] **C1**: 支持 5+ 种基础表情（眉/眼/嘴协同），眨眼动画自然
+- [ ] **B1**: VAD 触发足够准确（实际使用不明显误触发/漏触发），支持 VAD/按键/文本三模切换
+- [ ] **B2**: 触摸交互响应及时，点击头部/身体有反馈
+- [ ] **C1**: 支持多种基础表情（眉/眼/嘴协同），眨眼动画自然
 - [ ] **C2**: LLM 返回情绪标签，驱动表情/动作/TTS 联动
 - [ ] **D1**: 房间场景渲染正常，角色与家具无穿插
 - [ ] **D2**: 时间系统根据真实时间切换光照（4 个时段）
@@ -309,21 +373,19 @@ interface PipelineState {
 - [ ] **E1**: 支持至少 2 套完整模型切换（加载/卸载/重绑定动画）
 - [ ] **E1-1**: 换装过程有加载指示，不卡顿
 - [ ] **E1-2**: 换装后动作系统正常工作
-- [ ] **E1-3**: 无内存泄漏（切换10次内存增长<50MB）
 
-### 8.2 性能验收
+### 8.2 体验验收（非量化）
 
-- [ ] 桌面端 >= 60 FPS（房间场景 + MMD）
-- [ ] 移动端 >= 30 FPS
-- [ ] 内存占用 <= 300MB（含房间场景）
-- [ ] VAD 启动延迟 <= 500ms
-- [ ] 表情切换延迟 <= 50ms
+- [ ] 桌面端整体体验流畅、无明显卡顿
+- [ ] 移动端可用（可完成完整对话闭环）
+- [ ] 换装/切换后无明显资源残留导致的持续变卡
 
 ### 8.3 质量门禁
 
-- [ ] `npm run typecheck` 通过（0 error）
-- [ ] `npm run lint` 通过（0 error / 0 warning）
-- [ ] `npm run build` 通过
+- [ ] `npm run typecheck:web` 通过（0 error）（或 `cd web` 后执行 `npm run typecheck`）
+- [ ] `npm run lint:web` 通过（0 error / 0 warning）（或 `cd web` 后执行 `npm run lint`）
+- [ ] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
+ 
 - [ ] P0/P1/P2 功能回归通过
 - [ ] 降级机制验证通过
 
@@ -358,10 +420,9 @@ interface PipelineState {
 | 预研项 | 截止时间 | 负责人 | 状态 |
 |--------|---------|--------|------|
 | ~~白厄 PMX Morph 清单~~ | ~~Phase C 开始前~~ | ~~开发~~ | ✅ P2已完成（`あ`已确认） |
-| P2性能基准测试（加载/内存/帧率） | Phase A 结束前 | 开发 | ⬜ 待执行 |
 | VAD 库技术验证 | Phase B1 开始前 | 开发 | ⬜ 待执行 |
 | 房间资产采购/制作 | Phase D1 开始前 | 美术/策划 | ⬜ 待执行 |
-| 换装模型资产寻找 | Phase E1 开始前 | 美术/策划 | ⬜ 待执行 |
+| 换装模型清点/命名/迁移（从 mmd_download -> assets/models） | Phase E1 开始前 | 美术/策划/开发 | ⬜ 待执行 |
 | three.js r173 升级影响评估 | Phase A1 开始前 | 开发 | ⬜ 待执行 |
 
 ---
@@ -370,7 +431,7 @@ interface PipelineState {
 
 | 阶段 | 预估工作单元 | 说明 |
 |------|-------------|------|
-| Phase A (技术债) | 1-2 | P2基准测试 + MMDLoader Fork |
+| Phase A (技术债) | 1-2 | MMDLoader Fork |
 | Phase B (交互层) | 2-3 | VAD + 触摸互动 |
 | Phase C (表现层) | 2-3 | 表情系统 + 情绪联动 |
 | Phase D (空间层) | 2-3 | 房间 + 时间 + 相册 |
@@ -496,6 +557,7 @@ async def vip_required(feature: str):
 | v1.0 | 2026-02-14 | 初始版本 | AI Assistant |
 | v1.1 | 2026-02-14 | 根据P2收尾文档更新：<br>• 换装系统改为"总体模型切换"方案<br>• 添加A0 P2性能基准测试<br>• 更新P2已完成项与遗留项<br>• 添加P2技术积累（头发修复/相机优化/口型调试）<br>• 确认Morph名称已验证（`あ`）<br>• 更新风险矩阵与验收标准 | AI Assistant |
 | v1.2 | 2026-02-14 | 补充VIP相关内容：<br>• P2验收结论增加VIP模式门控与文字转语音链路<br>• P3不做什么明确P4工作范围（充值页、后端鉴权）<br>• 新增第12章P4展望，详细说明商业化与安全加固规划 | AI Assistant |
+| v1.3 | 2026-02-14 | 调整执行顺序与分工：<br>• 新增 Phase 0（Model Registry）并引入“强视觉AI/强逻辑AI”分工表<br>• 明确“双版本/多PMX”按多个模型登记与命名<br>• 取消 A0 性能基准测试与量化性能验收（改为非量化体验验收） | AI Assistant |
 
 ```
                               ╔═══════════════════╗
