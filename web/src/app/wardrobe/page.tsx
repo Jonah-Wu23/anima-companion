@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Search, X, ChevronLeft, ChevronRight, Loader2, Check, Sparkles } from 'lucide-react';
-import { useWardrobeStore } from '@/lib/store/wardrobeStore';
+import { selectCurrentModel, selectPreviewModel, useWardrobeStore } from '@/lib/store/wardrobeStore';
 import { AVAILABLE_MODELS, getAvailableModels } from '@/lib/wardrobe/model-registry';
 import { ModelCard } from '@/components/wardrobe/ModelCard';
 import { ModelPreview } from '@/components/wardrobe/ModelPreview';
@@ -73,9 +73,9 @@ const CATEGORIES = [
 ];
 
 export default function WardrobePage() {
+  const currentModel = useWardrobeStore(selectCurrentModel);
+  const previewModel = useWardrobeStore(selectPreviewModel);
   const {
-    currentModel,
-    previewModel,
     status,
     loadingProgress,
     errorMessage,
@@ -90,9 +90,20 @@ export default function WardrobePage() {
     confirmPreview,
     cancelPreview,
     setSidebarOpen,
+    setStatus,
+    setLoadingProgress,
+    setErrorMessage,
   } = useWardrobeStore();
 
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  useEffect(() => {
+    if (status === 'switching') {
+      setStatus('idle');
+      setLoadingProgress(0);
+      setErrorMessage(null);
+    }
+  }, [setErrorMessage, setLoadingProgress, setStatus, status]);
 
   // Filter models based on category and search
   const filteredModels = useMemo(() => {

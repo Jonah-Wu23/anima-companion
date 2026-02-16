@@ -27,10 +27,6 @@ export interface WardrobeState {
   // History
   recentModelIds: string[];
   
-  // Getters
-  get currentModel(): ModelInfo;
-  get previewModel(): ModelInfo | null;
-  
   // Actions
   setCurrentModel: (modelId: string) => void;
   setPreviewModel: (modelId: string | null) => void;
@@ -66,17 +62,6 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   selectedCategory: null,
   searchQuery: '',
   recentModelIds: [],
-  
-  // Getters
-  get currentModel() {
-    return getModelById(get().currentModelId) || getDefaultModel();
-  },
-  
-  get previewModel() {
-    const { previewModelId } = get();
-    if (!previewModelId) return null;
-    return getModelById(previewModelId) ?? null;
-  },
   
   // Actions
   setCurrentModel: (modelId) => {
@@ -179,3 +164,12 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     selectedCategory: null,
   }),
 }));
+
+export const selectCurrentModel = (state: WardrobeState): ModelInfo => {
+  return getModelById(state.currentModelId) ?? getDefaultModel();
+};
+
+export const selectPreviewModel = (state: WardrobeState): ModelInfo | null => {
+  if (!state.previewModelId) return null;
+  return getModelById(state.previewModelId) ?? null;
+};

@@ -29,6 +29,7 @@ const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phaino
 const REQUIRED_TTS_PROVIDER = 'qwen_clone_tts';
 const DEFAULT_QWEN_VOICE_ID = (process.env.NEXT_PUBLIC_QWEN_VOICE_ID || '').trim();
 const DEFAULT_QWEN_TARGET_MODEL = (process.env.NEXT_PUBLIC_QWEN_TARGET_MODEL || '').trim();
+const PRESS_TO_TALK_MIN_RELEASE_MS = 250;
 
 const VOICE_MODE_LABELS: Record<InputMode, { label: string; desc: string; icon: React.ReactNode }> = {
   text: { 
@@ -324,6 +325,7 @@ function RecordButton({
 }: RecordButtonProps) {
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const ignoreMouseUntilRef = useRef(0);
 
   const addRipple = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!buttonRef.current) return;
@@ -350,12 +352,16 @@ function RecordButton({
   }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (Date.now() < ignoreMouseUntilRef.current) {
+      return;
+    }
     addRipple(e);
     onStart();
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
+    ignoreMouseUntilRef.current = Date.now() + 800;
     addRipple(e);
     onTouchTrackStart?.(e);
     onStart();
@@ -366,13 +372,23 @@ function RecordButton({
   };
 
   const handleTouchEnd = () => {
+    ignoreMouseUntilRef.current = Date.now() + 800;
     onTouchTrackEnd?.();
     onStop();
   };
 
   const handleTouchCancel = () => {
+    ignoreMouseUntilRef.current = Date.now() + 800;
     onTouchTrackEnd?.();
     onCancel();
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    if (!isRecording) return;
+    // 仅在按住拖出按钮时取消，避免点击态被 hover/transform 抖动误触发。
+    if (e.buttons === 1) {
+      onCancel();
+    }
   };
 
   return (
@@ -381,7 +397,7 @@ function RecordButton({
       disabled={disabled}
       onMouseDown={handleMouseDown}
       onMouseUp={onStop}
-      onMouseLeave={onCancel}
+      onMouseLeave={handleMouseLeave}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -631,10 +647,14 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     if (!vadRecorderRef.current) {
       vadRecorderRef.current = new VADRecorder({
         onSpeechStart: () => {
-          usePipelineStore.getState().setVADStatus('speaking');
-          usePipelineStore.getState().setStage('recording');
+          const store = usePipelineStore.getState();
+          if (store.inputMode !== 'vad') return;
+          store.setVADStatus('speaking');
+          store.setStage('recording');
         },
         onSpeechEnd: async (audioBlob) => {
+          const store = usePipelineStore.getState();
+          if (store.inputMode !== 'vad') return;
           const submitVoice = submitVoiceBlobRef.current;
           if (!submitVoice) {
             return;
@@ -643,6 +663,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
         },
         onVADMisfire: () => {
           const store = usePipelineStore.getState();
+          if (store.inputMode !== 'vad') return;
           store.setVADStatus('listening');
           if (store.stage === 'recording') {
             store.setStage('idle');
@@ -650,14 +671,17 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
         },
         onStatusChange: (status) => {
           const store = usePipelineStore.getState();
+          if (store.inputMode !== 'vad') return;
           store.setVADStatus(status as VADStatus);
           if (status === 'listening' && store.stage === 'recording') {
             store.setStage('idle');
           }
         },
         onError: (error) => {
-          usePipelineStore.getState().setError(error.message || 'VAD 录音失败');
-          usePipelineStore.getState().setStage('error');
+          const store = usePipelineStore.getState();
+          if (store.inputMode !== 'vad') return;
+          store.setError(error.message || 'VAD 录音失败');
+          store.setStage('error');
         },
       });
     }
@@ -827,7 +851,13 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
 
   const stopRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
-    
+
+    const durationSinceStart = Date.now() - recordStartAtRef.current;
+    // 轻点时先保持录音，支持“点一次开始，再点一次结束”。
+    if (!isCanceling && durationSinceStart < PRESS_TO_TALK_MIN_RELEASE_MS) {
+      return;
+    }
+
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;

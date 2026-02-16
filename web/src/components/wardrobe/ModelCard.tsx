@@ -1,5 +1,6 @@
 import React from 'react';
-import type { ModelInfo } from '@/lib/wardrobe/model-registry';
+import Image from 'next/image';
+import { resolveModelThumbnailPath, type ModelInfo } from '@/lib/wardrobe/model-registry';
 import { Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,8 @@ export function ModelCard({
   className,
   style,
 }: ModelCardProps) {
+  const thumbnailSrc = resolveModelThumbnailPath(model);
+
   return (
     <button
       onClick={onClick}
@@ -43,10 +46,20 @@ export function ModelCard({
           'bg-gradient-to-br from-slate-100 to-slate-200',
           'flex items-center justify-center'
         )}>
-          {/* Icon or Initial */}
-          <span className="text-2xl font-bold text-slate-300">
-            {model.name.charAt(0)}
-          </span>
+          {thumbnailSrc ? (
+            <Image
+              src={thumbnailSrc}
+              alt={`${model.name}缩略图`}
+              fill
+              unoptimized
+              sizes="(max-width: 768px) 140px, 180px"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <span className="text-2xl font-bold text-slate-300">
+              {model.name.charAt(0)}
+            </span>
+          )}
           
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

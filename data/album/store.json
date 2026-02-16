@@ -1,8 +1,8 @@
 {
   "version": 1,
   "settings": {
-    "privacyEnabled": true,
-    "updatedAt": "2026-02-16T04:45:49.438Z"
+    "privacyEnabled": false,
+    "updatedAt": "2026-02-16T09:52:44.125Z"
   },
   "items": [
     {
@@ -227,6 +227,51 @@
     }
   ],
   "events": [
+    {
+      "id": "49f3fe26-d42d-450d-b48d-f4fdfdc8e2a5",
+      "createdAt": "2026-02-16T09:52:44.125Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已开启，停止记录",
+      "payload": {
+        "privacyEnabled": false
+      }
+    },
+    {
+      "id": "212280dd-b303-499c-8ced-6d303f5a47b3",
+      "createdAt": "2026-02-16T09:52:25.608Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已关闭，允许记录",
+      "payload": {
+        "privacyEnabled": true
+      }
+    },
+    {
+      "id": "d0db14ea-8428-4128-9bfd-cd1bdd9711cf",
+      "createdAt": "2026-02-16T07:44:17.005Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已开启，停止记录",
+      "payload": {
+        "privacyEnabled": false
+      }
+    },
+    {
+      "id": "8135a5dd-d7e3-4a6e-873b-ff5c68bceeb8",
+      "createdAt": "2026-02-16T07:44:15.934Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已关闭，允许记录",
+      "payload": {
+        "privacyEnabled": true
+      }
+    },
+    {
+      "id": "e40c360a-9f9d-41b2-baca-5c19efdd03a2",
+      "createdAt": "2026-02-16T07:44:13.927Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已开启，停止记录",
+      "payload": {
+        "privacyEnabled": false
+      }
+    },
     {
       "id": "38c56696-3489-4b27-9356-43e6f91e646b",
       "createdAt": "2026-02-16T05:29:42.111Z",

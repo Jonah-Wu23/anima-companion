@@ -1,5 +1,6 @@
 import React from 'react';
-import type { ModelInfo } from '@/lib/wardrobe/model-registry';
+import Image from 'next/image';
+import { resolveModelThumbnailPath, type ModelInfo } from '@/lib/wardrobe/model-registry';
 import { Sparkles, User, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +10,8 @@ interface ModelPreviewProps {
 }
 
 export function ModelPreview({ model, isPreview }: ModelPreviewProps) {
+  const thumbnailSrc = resolveModelThumbnailPath(model);
+
   return (
     <div className="w-full h-full flex items-center justify-center p-8">
       <div className={cn(
@@ -33,14 +36,24 @@ export function ModelPreview({ model, isPreview }: ModelPreviewProps) {
               'flex items-center justify-center',
               'relative overflow-hidden'
             )}>
+              {thumbnailSrc ? (
+                <Image
+                  src={thumbnailSrc}
+                  alt={`${model.name}预览图`}
+                  fill
+                  unoptimized
+                  sizes="(max-width: 1024px) 192px, 256px"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-6xl lg:text-8xl font-bold bg-gradient-to-br from-sky-400 to-cyan-600 bg-clip-text text-transparent">
+                  {model.name.charAt(0)}
+                </span>
+              )}
+
               {/* Decorative Rings */}
               <div className="absolute inset-0 rounded-full border-2 border-sky-200/50" />
               <div className="absolute inset-2 rounded-full border border-cyan-200/30" />
-              
-              {/* Initial */}
-              <span className="text-6xl lg:text-8xl font-bold bg-gradient-to-br from-sky-400 to-cyan-600 bg-clip-text text-transparent">
-                {model.name.charAt(0)}
-              </span>
               
               {/* Preview Badge */}
               {isPreview && (

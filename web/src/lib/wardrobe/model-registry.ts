@@ -23,6 +23,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '基础白厄形象，阳光邻家大男孩',
     directory: 'assets/models/Phainon',
     pmxFile: '星穹铁道—白厄3.pmx',
+    thumbnail: 'assets/model_photos/007.png',
     tags: ['基础', '默认'],
     isAvailable: true,
     author: '流云景',
@@ -30,24 +31,26 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
   },
   {
     id: 'model.Phainon_Khaslana_normal',
-    name: '卡厄斯兰那(法线版)',
-    nameEn: 'Khaslana (Normal)',
-    description: '卡厄斯兰那法线贴图版本，外套效果绑定评价很高',
+    name: '卡厄斯兰那（完整版）',
+    nameEn: 'Khaslana (Complete)',
+    description: '完整卡厄斯兰那形态（法线贴图版）',
     directory: 'assets/models/Phainon_Khaslana_normal',
     pmxFile: '星穹铁道—白厄3.pmx',
-    tags: ['变身', '外套'],
+    thumbnail: 'assets/model_photos/006.png',
+    tags: ['变身', '完整'],
     isAvailable: true,
     author: '流云景',
     priority: 2,
   },
   {
     id: 'model.Phainon_Khaslana',
-    name: '卡厄斯兰那',
+    name: '卡厄斯兰那（总裁版）',
     nameEn: 'Khaslana',
-    description: '完整卡厄斯兰那形态，需标注 Credits',
+    description: '总裁风格卡厄斯兰那形态，外套效果评价很高，需标注 Credits',
     directory: 'assets/models/Phainon_Khaslana',
     pmxFile: '卡厄斯兰那_1109.Pmx',
-    tags: ['变身', '完整'],
+    thumbnail: 'assets/model_photos/002.jpg',
+    tags: ['变身', '外套'],
     isAvailable: true,
     author: 'FixEll',
     priority: 3,
@@ -59,6 +62,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '粉色风格变体，可爱系',
     directory: 'assets/models/Phainon_Demiurge/白厄 - 粉3',
     pmxFile: '德谬歌-白厄.pmx',
+    thumbnail: 'assets/model_photos/004.jpg',
     tags: ['变体', '粉色'],
     isAvailable: true,
     author: '苏酥鱼鱼喵',
@@ -71,6 +75,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '红色风格变体，英气十足',
     directory: 'assets/models/Phainon_IronTomb_White/白厄 - red',
     pmxFile: '铁墓白.pmx',
+    thumbnail: 'assets/model_photos/001.jpg',
     tags: ['变体', '红色'],
     isAvailable: true,
     author: '苏酥鱼鱼喵',
@@ -83,6 +88,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '警服造型，帅气利落',
     directory: 'assets/models/Phainon_Agent_White',
     pmxFile: '警服白厄2.pmx',
+    thumbnail: 'assets/model_photos/003.jpg',
     tags: ['制服', '警服'],
     isAvailable: true,
     author: '随着2时间的推移',
@@ -95,6 +101,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '黑色特工造型，神秘冷峻',
     directory: 'assets/models/Phainon_Agent_Black',
     pmxFile: '黑厄2.pmx',
+    thumbnail: 'assets/model_photos/003.jpg',
     tags: ['制服', '特工', '黑色'],
     isAvailable: true,
     author: '随着2时间的推移',
@@ -107,6 +114,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '机长制服造型，成熟稳重',
     directory: 'assets/models/Phainon_CaptainUniform',
     pmxFile: '机长制服.pmx',
+    thumbnail: 'assets/model_photos/008.png',
     tags: ['制服', '机长'],
     isAvailable: true,
     author: '林槿',
@@ -119,6 +127,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '瑞幸咖啡联动特别造型',
     directory: 'assets/models/Phainon_LuckinCollab/白厄瑞幸联动',
     pmxFile: '瑞幸联动3.0.pmx',
+    thumbnail: 'assets/model_photos/005.jpg',
     tags: ['联动', '休闲'],
     isAvailable: true,
     author: '林槿',
@@ -131,6 +140,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '时尚杂志造型',
     directory: 'assets/models/Phainon_ANAN_Magazine/白厄anan杂志',
     pmxFile: '白厄anan杂志.pmx',
+    thumbnail: 'assets/model_photos/009.png',
     tags: ['时尚', '杂志'],
     isAvailable: true,
     author: '林槿',
@@ -143,6 +153,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '娘化变体，无翅膀无光环，婚纱级别',
     directory: 'assets/models/Phainon_Goddess/白厄女神 - by_填字小檀桌',
     pmxFile: '白厄女神(无翼无光环).pmx',
+    thumbnail: 'assets/model_photos/013.png',
     tags: ['娘化', '女神'],
     isAvailable: true,
     author: '填字小檀桌',
@@ -155,6 +166,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '娘化变体，带翅膀光环，婚纱级别',
     directory: 'assets/models/Phainon_Goddess/白厄女神 - by_填字小檀桌',
     pmxFile: '白厄女神（带翅膀光环）102.pmx',
+    thumbnail: 'assets/model_photos/012.png',
     tags: ['娘化', '女神', '翅膀'],
     isAvailable: true,
     author: '填字小檀桌',
@@ -167,6 +179,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '女士造型，短裙长发',
     directory: 'assets/models/Phainon_Lady/白厄女士 - 双版本',
     pmxFile: '白厄短裙长发.pmx',
+    thumbnail: 'assets/model_photos/011.png',
     tags: ['女士', '短裙'],
     isAvailable: true,
     author: '填字小檀桌',
@@ -179,6 +192,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '女士造型，风衣长发',
     directory: 'assets/models/Phainon_Lady/白厄女士 - 双版本',
     pmxFile: '白厄风衣长发.pmx',
+    thumbnail: 'assets/model_photos/010.png',
     tags: ['女士', '风衣'],
     isAvailable: true,
     author: '填字小檀桌',
@@ -210,15 +224,27 @@ function joinPath(directory: string, file: string): string {
   return `${normalizedDir}/${normalizedFile}`;
 }
 
+function resolveLocalFilePath(filePath: string): string {
+  const normalizedPath = normalizePath(filePath);
+  if (normalizedPath.startsWith('assets/') || normalizedPath.startsWith('configs/')) {
+    return encodeURI(`/api/local-files/${normalizedPath}`);
+  }
+  return encodeURI(`/api/local-files/assets/${normalizedPath}`);
+}
+
 export const resolveModelPmxPath = (model: ModelInfo): string => {
   const fullPath = joinPath(model.directory, model.pmxFile);
-  if (fullPath.startsWith('assets/') || fullPath.startsWith('configs/')) {
-    return `/api/local-files/${fullPath}`;
-  }
-  return `/api/local-files/assets/${fullPath}`;
+  return resolveLocalFilePath(fullPath);
 };
 
 export const resolveModelPmxPathById = (modelId: string): string => {
   const model = getModelById(modelId) ?? getDefaultModel();
   return resolveModelPmxPath(model);
+};
+
+export const resolveModelThumbnailPath = (model: ModelInfo): string | null => {
+  if (!model.thumbnail) {
+    return null;
+  }
+  return resolveLocalFilePath(model.thumbnail);
 };

@@ -260,8 +260,21 @@ export default function Viewport3D() {
     setSceneStatus('loading');
     setModelStatus('loading');
     setModelProgress(0);
-    return () => setSceneStatus('loading');
-  }, [setModelProgress, setModelStatus, setSceneStatus]);
+    return () => {
+      // 路由离开时清理换装态，避免 /wardrobe 页面被遗留 loading 遮罩锁死。
+      setSceneStatus('loading');
+      setWardrobeStatus('idle');
+      setWardrobeLoadingProgress(0);
+      setWardrobeErrorMessage(null);
+    };
+  }, [
+    setModelProgress,
+    setModelStatus,
+    setSceneStatus,
+    setWardrobeErrorMessage,
+    setWardrobeLoadingProgress,
+    setWardrobeStatus,
+  ]);
 
   const handleStatusChange = useCallback(
     (status: ModelStatus, detail?: string) => {
