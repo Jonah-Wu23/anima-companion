@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight, Trash2, Shield, Download } from 'lucide-react';
 import type { AlbumItem } from '@/lib/album/types';
 import { cn } from '@/lib/utils';
@@ -62,7 +63,6 @@ export function Lightbox({
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleClose = useCallback(() => {
     setIsClosing(true);
@@ -223,12 +223,14 @@ export function Lightbox({
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           )}
-          <img
-            ref={imageRef}
+          <Image
             src={item.url}
             alt={item.title}
+            fill
+            unoptimized
+            sizes="90vw"
             className={cn(
-              'max-w-full max-h-full object-contain rounded-lg',
+              'object-contain rounded-lg',
               'shadow-2xl shadow-black/20',
               'transition-opacity duration-300',
               isImageLoading ? 'opacity-0' : 'opacity-100'

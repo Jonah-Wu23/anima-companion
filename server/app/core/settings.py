@@ -132,6 +132,25 @@ class Settings:
     cosyvoice_language_hints: tuple[str, ...]
     cosyvoice_registry_path: Path
     cors_allow_origins: tuple[str, ...]
+    auth_session_secret: str
+    auth_session_ttl_seconds: int
+    auth_cookie_name: str
+    auth_cookie_secure: bool
+    aliyun_access_key_id: str
+    aliyun_access_key_secret: str
+    auth_sms_sign_name: str
+    auth_sms_template_code: str
+    auth_sms_template_param: str
+    auth_sms_scheme_name: str
+    auth_sms_country_code: str
+    auth_sms_interval_seconds: int
+    auth_sms_valid_minutes: int
+    auth_sms_challenge_ttl_seconds: int
+    auth_captcha_region: str
+    auth_captcha_dual_stack: bool
+    auth_captcha_scene_id_login: str
+    auth_captcha_scene_id_register: str
+    auth_captcha_scene_id_sms: str
 
 
 @lru_cache(maxsize=1)
@@ -311,6 +330,31 @@ def get_settings() -> Settings:
                 ],
             )
         ),
+        auth_session_secret=os.getenv("AUTH_SESSION_SECRET", "dev-only-change-me"),
+        auth_session_ttl_seconds=_to_int(os.getenv("AUTH_SESSION_TTL_SECONDS", "604800"), 604800),
+        auth_cookie_name=os.getenv("AUTH_COOKIE_NAME", "anima_sid"),
+        auth_cookie_secure=_to_bool(os.getenv("AUTH_COOKIE_SECURE", "false"), False),
+        aliyun_access_key_id=os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID", ""),
+        aliyun_access_key_secret=os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", ""),
+        auth_sms_sign_name=os.getenv("AUTH_SMS_SIGN_NAME", ""),
+        auth_sms_template_code=os.getenv("AUTH_SMS_TEMPLATE_CODE", ""),
+        auth_sms_template_param=os.getenv(
+            "AUTH_SMS_TEMPLATE_PARAM",
+            '{"code":"##code##","min":"5"}',
+        ),
+        auth_sms_scheme_name=os.getenv("AUTH_SMS_SCHEME_NAME", ""),
+        auth_sms_country_code=os.getenv("AUTH_SMS_COUNTRY_CODE", "86"),
+        auth_sms_interval_seconds=_to_int(os.getenv("AUTH_SMS_INTERVAL_SECONDS", "60"), 60),
+        auth_sms_valid_minutes=_to_int(os.getenv("AUTH_SMS_VALID_MINUTES", "5"), 5),
+        auth_sms_challenge_ttl_seconds=_to_int(
+            os.getenv("AUTH_SMS_CHALLENGE_TTL_SECONDS", "600"),
+            600,
+        ),
+        auth_captcha_region=os.getenv("AUTH_CAPTCHA_REGION", "cn"),
+        auth_captcha_dual_stack=_to_bool(os.getenv("AUTH_CAPTCHA_DUAL_STACK", "false"), False),
+        auth_captcha_scene_id_login=os.getenv("AUTH_CAPTCHA_SCENE_ID_LOGIN", ""),
+        auth_captcha_scene_id_register=os.getenv("AUTH_CAPTCHA_SCENE_ID_REGISTER", ""),
+        auth_captcha_scene_id_sms=os.getenv("AUTH_CAPTCHA_SCENE_ID_SMS", ""),
     )
 
 

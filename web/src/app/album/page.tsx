@@ -69,8 +69,8 @@ export default function AlbumPage() {
   // Derived data
   const privacyEnabled = snapshot?.settings.privacyEnabled ?? true;
   const privacyProtectionEnabled = !privacyEnabled;
-  const allItems = snapshot?.items ?? [];
-  const events = snapshot?.events ?? [];
+  const allItems = useMemo(() => snapshot?.items ?? [], [snapshot?.items]);
+  const events = useMemo(() => snapshot?.events ?? [], [snapshot?.events]);
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -182,7 +182,7 @@ export default function AlbumPage() {
               {/* Left: Title & Back */}
               <div className="space-y-1">
                 <Link
-                  href="/"
+                  href="/chat"
                   className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-sky-600 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />

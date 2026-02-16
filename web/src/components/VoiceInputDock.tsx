@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
 import { Send, Mic, Settings, XCircle, Volume2, VolumeX, AudioWaveform } from 'lucide-react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore, type InputMode, type VADStatus } from '@/lib/store/pipelineStore';
@@ -453,6 +454,7 @@ function RecordButton({
 // ============================================================================
 
 export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const router = useRouter();
   // State
   const [inputValue, setInputValue] = useState('');
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
@@ -484,7 +486,6 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const addMessage = useSessionStore((state) => state.addMessage);
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
-  const enableVipMode = useSettingsStore((state) => state.enableVipMode);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
   
   const {
@@ -1109,6 +1110,11 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     return '准备就绪';
   }, [stage, pipelineError, isVADMode, vadConfig.label, isPushToTalkMode, isRecordingLocal, recordingDuration, isPipelineBusy]);
 
+  const handleActivateVip = useCallback(() => {
+    setIsVipModalOpen(false);
+    router.push('/sponsor?return_to=/chat');
+  }, [router]);
+
   return (
     <>
       <div 
@@ -1311,10 +1317,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       <VipModal
         isOpen={isVipModalOpen}
         onClose={() => setIsVipModalOpen(false)}
-        onActivate={() => {
-          enableVipMode();
-          setIsVipModalOpen(false);
-        }}
+        onActivate={handleActivateVip}
       />
 
       <TouchFeedbackStyles />

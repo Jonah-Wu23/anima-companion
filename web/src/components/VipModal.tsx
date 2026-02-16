@@ -49,7 +49,7 @@ export function VipModal({ isOpen, onClose, onActivate }: VipModalProps) {
             </div>
 
             <p className="text-center text-slate-500 text-sm mb-8 leading-relaxed">
-              解锁完整语音交互体验，让对话更生动自然
+              VIP 功能免费开放，若愿意支持我们可先自愿打赏 6 元
             </p>
 
             <div className="space-y-3 mb-8">
@@ -99,7 +99,7 @@ export function VipModal({ isOpen, onClose, onActivate }: VipModalProps) {
                 className="w-full h-12 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-white font-semibold shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 group"
               >
                 <Crown className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                <span>立即开启 VIP</span>
+                <span>去打赏页启用 VIP</span>
               </button>
               <button
                 onClick={onClose}
@@ -109,7 +109,7 @@ export function VipModal({ isOpen, onClose, onActivate }: VipModalProps) {
               </button>
             </div>
 
-            <p className="text-center text-xs text-slate-400 mt-5">开启即表示同意 VIP 服务条款</p>
+            <p className="text-center text-xs text-slate-400 mt-5">打赏完全自愿，不影响 VIP 启用</p>
           </div>
         </div>
       </div>

@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Backend services for anima companion android"
 requires-python = ">=3.11"
 dependencies = [
+  "alibabacloud-captcha20230305>=1.0.10",
+  "alibabacloud-dypnsapi20170525>=2.0.25",
   "dashscope>=1.23.1",
   "fastapi>=0.115.0",
   "httpx>=0.28.0",

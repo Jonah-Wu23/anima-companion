@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
 import { Send, Mic, Settings, XCircle } from 'lucide-react';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore, type InputMode, type VADStatus } from '@/lib/store/pipelineStore';
@@ -134,6 +135,7 @@ function extractApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const router = useRouter();
   const [inputValue, setInputValue] = useState('');
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -143,7 +145,6 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const addMessage = useSessionStore((state) => state.addMessage);
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
-  const enableVipMode = useSettingsStore((state) => state.enableVipMode);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
   
   const {
@@ -336,9 +337,9 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   }, [setError, setStage]);
 
   const handleActivateVip = useCallback(() => {
-    enableVipMode();
     setIsVipModalOpen(false);
-  }, [enableVipMode]);
+    router.push('/sponsor?return_to=/chat');
+  }, [router]);
 
   const forceStopPressToTalk = useCallback(() => {
     if (timerIntervalRef.current) {

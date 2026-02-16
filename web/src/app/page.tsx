@@ -1,321 +1,317 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { MessagePanel } from '@/components/MessagePanel';
-import { VoiceInputDock } from '@/components/VoiceInputDock';
-import { SettingsSheet } from '@/components/SettingsSheet';
-import { TopBar } from '@/components/TopBar';
-import { AlbumCapturePromptModal } from '@/components/AlbumCapturePromptModal';
-import { useAvatarStore } from '@/lib/store/avatarStore';
-import { LoadingScreen } from '@/components/LoadingScreen';
-import { TouchInteractionProvider } from '@/lib/interaction/TouchInteractionProvider';
-import { albumApi } from '@/lib/album/client';
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { 
+  MessageCircle, 
+  Mic, 
+  Brain, 
+  Box,
+  ChevronRight,
+  Star,
+  Heart,
+  Sparkles
+} from "lucide-react";
 
-const Viewport3D = dynamic(
-  () => import('@/components/Viewport3D').then((mod) => mod.default),
+const features = [
   {
-    ssr: false,
-    loading: () => <div className="w-full h-full bg-sky-50/20 animate-pulse" />,
+    icon: MessageCircle,
+    title: "文字对话",
+    description: "随时随地，用文字分享你的心情与想法",
   },
-);
+  {
+    icon: Mic,
+    title: "语音陪伴",
+    description: "像和朋友聊天一样，用声音传递温暖",
+  },
+  {
+    icon: Brain,
+    title: "记忆共鸣",
+    description: "记住你们的故事，越聊越懂你",
+  },
+  {
+    icon: Box,
+    title: "3D 互动",
+    description: "逼真的角色表现，让陪伴更有温度",
+  },
+];
 
-const MOBILE_VIEWPORT_DEFAULT_RATIO = 0.4;
-const MOBILE_VIEWPORT_MIN_RATIO = 0.28;
-const MOBILE_VIEWPORT_MAX_RATIO = 0.72;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-export default function Home() {
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDesktopLayout, setIsDesktopLayout] = useState(true);
-  const [mobileViewportHeight, setMobileViewportHeight] = useState<number | null>(null);
-  const [isResizingViewport, setIsResizingViewport] = useState(false);
-  const [isCapturePromptOpen, setIsCapturePromptOpen] = useState(false);
-  const [captureTitle, setCaptureTitle] = useState('');
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [captureFeedback, setCaptureFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const { sceneStatus } = useAvatarStore();
-  const mainRef = useRef<HTMLElement | null>(null);
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
-  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const updateMobileViewportHeight = useCallback((clientY: number) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const containerTop = mainRef.current?.getBoundingClientRect().top ?? 0;
-    const viewportHeight = window.innerHeight;
-    const minHeight = viewportHeight * MOBILE_VIEWPORT_MIN_RATIO;
-    const maxHeight = viewportHeight * MOBILE_VIEWPORT_MAX_RATIO;
-    const nextHeight = clamp(clientY - containerTop, minHeight, maxHeight);
-    setMobileViewportHeight(nextHeight);
-  }, []);
-
-  const stopResizeViewport = useCallback(() => {
-    resizeCleanupRef.current?.();
-    resizeCleanupRef.current = null;
-    setIsResizingViewport(false);
-  }, []);
-
-  const handleViewportResizeStart = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (isDesktopLayout || typeof window === 'undefined') {
-        return;
-      }
-
-      event.preventDefault();
-      stopResizeViewport();
-      setIsResizingViewport(true);
-      updateMobileViewportHeight(event.clientY);
-
-      const onPointerMove = (moveEvent: PointerEvent) => {
-        moveEvent.preventDefault();
-        updateMobileViewportHeight(moveEvent.clientY);
-      };
-
-      const onPointerEnd = () => {
-        stopResizeViewport();
-      };
-
-      window.addEventListener('pointermove', onPointerMove, { passive: false });
-      window.addEventListener('pointerup', onPointerEnd);
-      window.addEventListener('pointercancel', onPointerEnd);
-
-      resizeCleanupRef.current = () => {
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerEnd);
-        window.removeEventListener('pointercancel', onPointerEnd);
-      };
-    },
-    [isDesktopLayout, stopResizeViewport, updateMobileViewportHeight]
-  );
+export default function HomePage() {
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const syncLayout = () => {
-      const viewportHeight = window.innerHeight;
-      const isDesktop = window.innerWidth >= 1024;
-      const minHeight = viewportHeight * MOBILE_VIEWPORT_MIN_RATIO;
-      const maxHeight = viewportHeight * MOBILE_VIEWPORT_MAX_RATIO;
-      setIsDesktopLayout(isDesktop);
-      setMobileViewportHeight((prev) => {
-        const fallbackHeight = viewportHeight * MOBILE_VIEWPORT_DEFAULT_RATIO;
-        return clamp(prev ?? fallbackHeight, minHeight, maxHeight);
-      });
-    };
-
-    syncLayout();
-    window.addEventListener('resize', syncLayout);
-    window.addEventListener('orientationchange', syncLayout);
-
-    return () => {
-      window.removeEventListener('resize', syncLayout);
-      window.removeEventListener('orientationchange', syncLayout);
-    };
+    setIsLoaded(true);
   }, []);
-
-  useEffect(() => () => {
-    stopResizeViewport();
-  }, [stopResizeViewport]);
-
-  const showCaptureFeedback = useCallback((type: 'success' | 'error', message: string) => {
-    setCaptureFeedback({ type, message });
-    if (feedbackTimerRef.current) {
-      clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = null;
-    }
-    feedbackTimerRef.current = setTimeout(() => {
-      setCaptureFeedback(null);
-      feedbackTimerRef.current = null;
-    }, 2600);
-  }, []);
-
-  useEffect(() => () => {
-    if (feedbackTimerRef.current) {
-      clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = null;
-    }
-  }, []);
-
-  const openAlbumPage = useCallback(() => {
-    router.push('/album');
-  }, [router]);
-
-  const captureCanvasFrame = useCallback(async (): Promise<{ blob: Blob; width: number; height: number }> => {
-    const canvas = document.querySelector('main canvas') as HTMLCanvasElement | null;
-    if (!canvas) {
-      throw new Error('当前页面未检测到可截图的画布');
-    }
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve());
-    });
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => {
-          if (!result) {
-            reject(new Error('截图失败，请稍后重试'));
-            return;
-          }
-          resolve(result);
-        },
-        'image/png',
-        0.92,
-      );
-    });
-
-    return {
-      blob,
-      width: canvas.width,
-      height: canvas.height,
-    };
-  }, []);
-
-  const handleCaptureMoment = useCallback(async () => {
-    if (isCapturing) {
-      return;
-    }
-
-    setIsCapturing(true);
-    try {
-      const { blob, width, height } = await captureCanvasFrame();
-      const title = `对白瞬间 ${new Date().toLocaleString('zh-CN', { hour12: false })}`;
-      await albumApi.captureScreenshot(blob, {
-        title,
-        width,
-        height,
-      });
-      setCaptureTitle(title);
-      setIsCapturePromptOpen(true);
-      showCaptureFeedback('success', '截图已写入回忆相册');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '截图失败';
-      showCaptureFeedback('error', message);
-    } finally {
-      setIsCapturing(false);
-    }
-  }, [captureCanvasFrame, isCapturing, showCaptureFeedback]);
-
-  const isLoading = !mounted || sceneStatus === 'loading';
-  const mobileViewportStyle =
-    !isDesktopLayout && mobileViewportHeight !== null
-      ? { height: `${mobileViewportHeight}px` }
-      : undefined;
 
   return (
-    <main
-      ref={mainRef}
-      className="relative flex flex-col lg:flex-row w-full h-[100dvh] overflow-hidden bg-gradient-to-br from-sky-50 via-white to-blue-50 text-slate-800"
-    >
-      <LoadingScreen isLoading={isLoading} />
-      {captureFeedback && (
-        <div
-          className={`pointer-events-none fixed left-1/2 top-16 z-[75] -translate-x-1/2 rounded-full px-4 py-2 text-sm font-medium shadow-lg backdrop-blur-md ${
-            captureFeedback.type === 'success'
-              ? 'bg-emerald-500/90 text-white'
-              : 'bg-rose-500/90 text-white'
-          }`}
-        >
-          {captureFeedback.message}
-        </div>
-      )}
-      
-      {mounted && (
-        <TouchInteractionProvider>
-          {/* Mobile TopBar (Fixed Overlay) */}
-          <TopBar 
-            className="lg:hidden fixed top-0 left-0 w-full z-50" 
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenAlbum={openAlbumPage}
-            onCaptureMoment={() => void handleCaptureMoment()}
-            captureDisabled={isLoading || isCapturing}
-          />
+    <main className="relative min-h-screen bg-[#F8FAFC] overflow-x-hidden">
+      {/* Background Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-blue-100/60 to-transparent rounded-full blur-[100px]" />
+        <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-indigo-100/40 to-transparent rounded-full blur-[80px]" />
+      </div>
 
-          {/* Left Column (Desktop) / Top Section (Mobile) - Viewport 3D */}
-          <section
-            className="relative w-full h-[40vh] lg:w-[40%] lg:h-full shrink-0 z-0"
-            style={mobileViewportStyle}
+      {/* Navigation */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
+        <div className="mx-auto max-w-5xl px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#3B82F6] rounded-lg flex items-center justify-center shadow-sm">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-base font-semibold text-[#1E293B]">二次元情感陪伴助手</span>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-sm font-medium text-[#475569] hover:text-[#1E293B] transition-colors duration-200">
+              功能
+            </a>
+            <Link href="/login" className="text-sm font-medium text-[#475569] hover:text-[#1E293B] transition-colors duration-200">
+              登录
+            </Link>
+          </nav>
+
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white bg-[#1E293B] rounded-lg hover:bg-[#334155] transition-colors duration-200 shadow-sm"
           >
-            <Viewport3D />
-            
-            {/* Mobile Gradient Overlay for better text contrast if needed */}
-            <div className="lg:hidden absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-white/40 to-transparent pointer-events-none" />
-          </section>
+            开始使用
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </header>
 
-          {/* Right Column (Desktop) / Bottom Section (Mobile) - Chat Interface */}
-          <section className="flex-1 w-full lg:w-[60%] lg:h-full flex flex-col relative z-10 bg-white/40 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none border-t border-white/20 lg:border-t-0 lg:border-l lg:border-white/30 shadow-2xl lg:shadow-none rounded-t-3xl lg:rounded-none -mt-6 lg:mt-0 pt-2 lg:pt-0 overflow-hidden">
-            
-            {/* Desktop TopBar */}
-            <TopBar 
-              className="hidden lg:flex" 
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onOpenAlbum={openAlbumPage}
-              onCaptureMoment={() => void handleCaptureMoment()}
-              captureDisabled={isLoading || isCapturing}
-            />
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-24 md:pt-40 md:pb-32 px-6 overflow-hidden">
+        {/* Hero Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(/images/hero.png)' }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#F8FAFC]/70 via-[#F8FAFC]/50 to-[#F8FAFC]" />
+        
+        <div className="relative mx-auto max-w-5xl">
+          <div className="text-center max-w-2xl mx-auto">
+            {/* Badge */}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm mb-8 transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+              <span className="text-sm font-medium text-[#475569]">完全免费，无需付费</span>
+            </div>
 
-            {/* Mobile viewport resize handle */}
-            {!isDesktopLayout && (
-              <div className="shrink-0 px-4 pt-1 pb-1 lg:hidden">
-                <button
-                  type="button"
-                  aria-label="调整3D区域高度"
-                  onPointerDown={handleViewportResizeStart}
-                  className="mx-auto flex h-6 w-16 touch-none items-center justify-center"
-                >
-                  <span
-                    className={`h-1.5 w-12 rounded-full transition-colors ${
-                      isResizingViewport ? 'bg-sky-400' : 'bg-slate-300/80'
-                    }`}
-                  />
-                </button>
+            {/* Title */}
+            <h1 className={`text-4xl md:text-5xl lg:text-6xl font-bold text-[#1E293B] leading-[1.15] mb-6 transition-all duration-500 delay-100 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              遇见
+              <span className="text-[#2563EB]">白厄</span>
+              <span className="block mt-2">你的专属陪伴</span>
+            </h1>
+
+            {/* Subtitle */}
+            <p className={`text-lg text-[#475569] max-w-lg mx-auto mb-10 leading-relaxed transition-all duration-500 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              文字对话、语音交流、3D互动，
+              <br className="hidden sm:block" />
+              每一次交流都温暖而有意义
+            </p>
+
+            {/* CTA Buttons */}
+            <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-500 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <Link
+                href="/register"
+                className="group inline-flex items-center gap-2 px-8 py-4 text-base font-semibold text-white bg-[#2563EB] rounded-xl hover:bg-[#1D4ED8] transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              >
+                免费开始体验
+                <ChevronRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 px-8 py-4 text-base font-semibold text-[#475569] bg-white rounded-xl border border-slate-200 hover:border-[#2563EB]/30 hover:bg-slate-50 transition-all duration-200"
+              >
+                已有账号登录
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="relative py-20 px-6">
+        <div className="mx-auto max-w-5xl">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#1E293B] mb-4">
+              温暖的陪伴方式
+            </h2>
+            <p className="text-lg text-[#475569] max-w-md mx-auto">
+              注册即可使用全部功能，无需任何费用
+            </p>
+          </div>
+
+          {/* Feature Cards */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {features.map((feature, index) => (
+              <div
+                key={feature.title}
+                className={`group relative p-6 bg-white rounded-xl border border-slate-200 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[#2563EB]/20 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                style={{ transitionDelay: `${(index + 1) * 100}ms` }}
+              >
+                {/* Icon */}
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#EFF6FF] to-[#DBEAFE] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
+                  <feature.icon className="w-6 h-6 text-[#2563EB]" />
+                </div>
+
+                {/* Content */}
+                <h3 className="text-lg font-semibold text-[#1E293B] mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-[#475569] leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Message Panel (Scrollable) */}
-            <div className="flex-1 min-h-0 w-full relative">
-              <MessagePanel />
+      {/* Why Choose Section */}
+      <section className="relative py-20 px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold text-[#1E293B] mb-8">
+                为什么选择我们？
+              </h2>
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-5 h-5 text-[#2563EB]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1E293B] mb-1">完全免费</h3>
+                    <p className="text-[#475569] text-sm">所有功能免费开放，无需订阅，没有隐藏费用</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] flex items-center justify-center flex-shrink-0">
+                    <Heart className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1E293B] mb-1">自然陪伴</h3>
+                    <p className="text-[#475569] text-sm">支持多种交流方式，对话流畅自然，像朋友一样</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#FDF4FF] flex items-center justify-center flex-shrink-0">
+                    <Brain className="w-5 h-5 text-violet-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1E293B] mb-1">持续成长</h3>
+                    <p className="text-[#475569] text-sm">不断优化体验，定期推出新功能</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Voice Input Dock */}
-            <div className="shrink-0 w-full z-50 bg-white/80 backdrop-blur-md lg:bg-white lg:backdrop-blur-none border-t border-white/20 lg:border-gray-100">
-              <VoiceInputDock onOpenSettings={() => setIsSettingsOpen(true)} />
+            {/* Right - CTA Card */}
+            <div className="relative">
+              <div className="bg-gradient-to-br from-[#1E293B] to-[#334155] rounded-2xl p-8 text-white shadow-xl">
+                <h3 className="text-2xl font-bold mb-3">准备好开始了吗？</h3>
+                <p className="text-slate-300 mb-8 text-sm">
+                  只需30秒注册，即可体验完整的陪伴服务
+                </p>
+                <div className="space-y-3">
+                  <Link
+                    href="/register"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-[#1E293B] bg-white rounded-xl hover:bg-slate-100 transition-colors duration-200"
+                  >
+                    立即注册
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium text-white border border-white/20 rounded-xl hover:bg-white/10 transition-colors duration-200"
+                  >
+                    登录账号
+                  </Link>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-          </section>
+      {/* Support Section */}
+      <section className="relative py-20 px-6">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 rounded-2xl mb-6">
+            <Star className="w-7 h-7 text-amber-600 fill-amber-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-[#1E293B] mb-4">
+            喜欢白厄？支持我们
+          </h2>
+          <p className="text-[#475569] mb-8 max-w-md mx-auto">
+            项目需要服务器和AI模型费用才能持续运行，你的每一份支持都让我们能做得更好
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
+            <div className="bg-white px-8 py-6 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-xs text-[#94A3B8] mb-1 uppercase tracking-wide">推荐支持</div>
+              <div className="text-4xl font-bold text-[#1E293B]">
+                6<span className="text-lg text-[#64748B] ml-1">元</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 text-left">
+              <div className="flex items-center gap-2 text-sm text-[#475569]">
+                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <span className="text-emerald-600 text-xs font-bold">✓</span>
+                </div>
+                不打赏也能用
+              </div>
+              <div className="flex items-center gap-2 text-sm text-[#475569]">
+                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <span className="text-emerald-600 text-xs font-bold">✓</span>
+                </div>
+                功能完全免费
+              </div>
+              <div className="flex items-center gap-2 text-sm text-[#475569]">
+                <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+                  <span className="text-amber-600 text-xs">★</span>
+                </div>
+                感谢每一份心意
+              </div>
+            </div>
+          </div>
+          
+          <Link
+            href="/sponsor"
+            className="inline-flex items-center gap-2 px-8 py-4 text-sm font-semibold text-white bg-[#2563EB] rounded-xl hover:bg-[#1D4ED8] transition-colors duration-200 shadow-md"
+          >
+            去打赏支持
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
 
-          {/* Settings Sheet */}
-          <SettingsSheet 
-            isOpen={isSettingsOpen} 
-            onClose={() => setIsSettingsOpen(false)} 
-          />
-
-          <AlbumCapturePromptModal
-            isOpen={isCapturePromptOpen}
-            title={captureTitle}
-            onStay={() => setIsCapturePromptOpen(false)}
-            onGoAlbum={() => {
-              setIsCapturePromptOpen(false);
-              openAlbumPage();
-            }}
-          />
-        </TouchInteractionProvider>
-      )}
+      {/* Footer */}
+      <footer className="relative py-10 px-6 border-t border-slate-200">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#3B82F6] rounded-lg flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-semibold text-[#1E293B]">二次元情感陪伴助手</span>
+            </div>
+            <div className="flex items-center gap-6 text-sm text-[#64748B]">
+              <Link href="/login" className="hover:text-[#1E293B] transition-colors duration-200">登录</Link>
+              <Link href="/register" className="hover:text-[#1E293B] transition-colors duration-200">注册</Link>
+              <a href="#" className="hover:text-[#1E293B] transition-colors duration-200">服务条款</a>
+              <a href="#" className="hover:text-[#1E293B] transition-colors duration-200">隐私政策</a>
+            </div>
+            <div className="text-sm text-[#94A3B8]">
+              © 2025
+            </div>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

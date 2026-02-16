@@ -88,3 +88,52 @@ export interface UserClearRequest {
 export interface UserClearResponse {
   ok: boolean;
 }
+
+export interface AuthRegisterRequest {
+  phone: string;
+  sms_challenge_id: string;
+  sms_code: string;
+  password: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthLoginPasswordRequest {
+  account: string;
+  password: string;
+  captcha_verify_param: string;
+}
+
+export type AuthSmsScene = "register" | "login" | "reset_password";
+
+export interface AuthSmsSendRequest {
+  phone: string;
+  scene: AuthSmsScene;
+  captcha_verify_param: string;
+}
+
+export interface AuthSmsSendResponse {
+  sms_challenge_id: string;
+  retry_after_sec: number;
+}
+
+export interface AuthLoginSmsRequest {
+  phone: string;
+  sms_challenge_id: string;
+  sms_code: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthUser {
+  id: number;
+  account: string;
+  created_at: number;
+}
+
+export interface AuthSessionResponse {
+  user: AuthUser;
+  expires_at: number;
+}
+
+export interface AuthLogoutResponse {
+  ok: boolean;
+}

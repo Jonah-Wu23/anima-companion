@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2, MonitorPlay, Trash2, AlertTriangle, Info, Settings2, Crown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   Sheet,
   SheetContent,
@@ -18,6 +19,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
+  const router = useRouter();
   const { 
     autoPlayVoice, 
     reducedMotion, 
@@ -34,6 +36,20 @@ export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
       clearSession();
       onClose();
     }
+  };
+
+  const handleVipSwitchChange = (nextChecked: boolean) => {
+    if (nextChecked === vipModeEnabled) {
+      return;
+    }
+
+    if (nextChecked) {
+      onClose();
+      router.push('/sponsor?return_to=/chat');
+      return;
+    }
+
+    toggleVipMode();
   };
 
   return (
@@ -76,7 +92,7 @@ export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
                                     <div className="text-xs text-slate-500 mt-0.5">解锁语音输入与文字转语音回复</div>
                                 </div>
                             </div>
-                            <Switch checked={vipModeEnabled} onCheckedChange={toggleVipMode} />
+                            <Switch checked={vipModeEnabled} onCheckedChange={handleVipSwitchChange} />
                         </div>
                         
                         {/* 选项：自动播放 */}

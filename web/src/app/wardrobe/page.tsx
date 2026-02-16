@@ -185,7 +185,7 @@ export default function WardrobePage() {
             <header className="flex-none px-6 py-5 border-b border-slate-100">
               <div className="flex items-center justify-between mb-4">
                 <Link
-                  href="/"
+                  href="/chat"
                   className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-sky-600 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />

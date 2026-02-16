@@ -2,7 +2,7 @@
   "version": 1,
   "settings": {
     "privacyEnabled": false,
-    "updatedAt": "2026-02-16T09:52:44.125Z"
+    "updatedAt": "2026-02-16T15:19:40.498Z"
   },
   "items": [
     {
@@ -224,9 +224,49 @@
       "capturedAt": "2026-02-16T05:29:42.111Z",
       "createdAt": "2026-02-16T05:29:42.111Z",
       "updatedAt": "2026-02-16T05:29:42.111Z"
+    },
+    {
+      "id": "42fe2bc6-7afb-4851-8224-df56d3dd1795",
+      "filename": "album-shot-20260216-231826-4da48e62.png",
+      "title": "对白瞬间 2026/2/16 23:18:26",
+      "source": "screenshot",
+      "mimeType": "image/png",
+      "sizeBytes": 632315,
+      "capturedAt": "2026-02-16T15:18:26.587Z",
+      "createdAt": "2026-02-16T15:18:26.588Z",
+      "updatedAt": "2026-02-16T15:18:26.588Z"
     }
   ],
   "events": [
+    {
+      "id": "801a6808-381e-42b3-9a78-0aa52c692230",
+      "createdAt": "2026-02-16T15:19:40.498Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已开启，停止记录",
+      "payload": {
+        "privacyEnabled": false
+      }
+    },
+    {
+      "id": "31ec2c8b-26c6-43bf-9470-e89e7bad31f1",
+      "createdAt": "2026-02-16T15:18:26.589Z",
+      "type": "screenshot_captured",
+      "itemId": "42fe2bc6-7afb-4851-8224-df56d3dd1795",
+      "note": "用户在主页拍摄截图",
+      "payload": {
+        "width": 1024,
+        "height": 1187
+      }
+    },
+    {
+      "id": "d57a5045-1a19-4a57-be9b-856bb74f943f",
+      "createdAt": "2026-02-16T15:18:10.348Z",
+      "type": "privacy_changed",
+      "note": "隐私开关已关闭，允许记录",
+      "payload": {
+        "privacyEnabled": true
+      }
+    },
     {
       "id": "49f3fe26-d42d-450d-b48d-f4fdfdc8e2a5",
       "createdAt": "2026-02-16T09:52:44.125Z",

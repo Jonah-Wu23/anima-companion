@@ -1,5 +1,12 @@
 import axios from 'axios';
 import { 
+  AuthLoginPasswordRequest,
+  AuthLoginSmsRequest,
+  AuthLogoutResponse,
+  AuthRegisterRequest,
+  AuthSmsSendRequest,
+  AuthSmsSendResponse,
+  AuthSessionResponse,
   ChatTextRequest, 
   ChatTextResponse, 
   ChatTextVoiceResponse,
@@ -19,12 +26,44 @@ const apiClient = axios.create({
   // Default to 18000 to avoid stale legacy service on 8000.
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:18000',
   timeout: 30000, // 30s timeout
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 export const api = {
+  // Auth
+  sendSmsCode: async (payload: AuthSmsSendRequest): Promise<AuthSmsSendResponse> => {
+    const { data } = await apiClient.post<AuthSmsSendResponse>('/v1/auth/sms/send', payload);
+    return data;
+  },
+
+  register: async (payload: AuthRegisterRequest): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.post<AuthSessionResponse>('/v1/auth/register', payload);
+    return data;
+  },
+
+  loginWithPassword: async (payload: AuthLoginPasswordRequest): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.post<AuthSessionResponse>('/v1/auth/login/password', payload);
+    return data;
+  },
+
+  loginWithSms: async (payload: AuthLoginSmsRequest): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.post<AuthSessionResponse>('/v1/auth/login/sms', payload);
+    return data;
+  },
+
+  logout: async (): Promise<AuthLogoutResponse> => {
+    const { data } = await apiClient.post<AuthLogoutResponse>('/v1/auth/logout');
+    return data;
+  },
+
+  me: async (): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.get<AuthSessionResponse>('/v1/auth/me');
+    return data;
+  },
+
   // Chat Text
   chatText: async (payload: ChatTextRequest): Promise<ChatTextResponse> => {
     const { data } = await apiClient.post<ChatTextResponse>('/v1/chat/text', payload);

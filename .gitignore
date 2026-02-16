@@ -6,7 +6,6 @@ Thumbs.db
 .idea/
 .vscode/
 .trae/
-.github/
 opencode.json
 *.iml
 .opencode/

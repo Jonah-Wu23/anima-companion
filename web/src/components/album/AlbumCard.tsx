@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Calendar, Clock, Camera, FolderOpen, Trash2, Eye } from 'lucide-react';
 import type { AlbumItem } from '@/lib/album/types';
 import { cn } from '@/lib/utils';
@@ -108,17 +109,19 @@ export function AlbumCard({ item, index, onDelete, onView, isDeleting = false }:
           </div>
         )}
         
-        <img
+        <Image
           src={item.url}
           alt={item.title}
+          fill
+          unoptimized
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
           className={cn(
-            'w-full h-full object-cover',
+            'object-cover',
             'transition-all duration-500 ease-out',
             'group-hover:scale-105',
             imageLoaded ? 'opacity-100' : 'opacity-0'
           )}
           onLoad={() => setImageLoaded(true)}
-          loading="lazy"
         />
 
         {/* Hover overlay */}
