@@ -9,17 +9,39 @@ Thumbs.db
 .github/
 opencode.json
 *.iml
+.opencode/
 
 # Logs
 *.log
+*.stdout.log
+*.stderr.log
 logs/
 
 # Env / secrets
 .env
 .env.*
 !.env.example
+!**/.env.example
+!*.env.sample
+!**/.env.sample
+web/.env.local
 secrets/
 config.yaml
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.keystore
+server/.data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/
@@ -30,6 +52,7 @@ venv/
 
 # Node
 node_modules/
+*.tsbuildinfo
 
 # Android / Gradle
 android/.gradle/
@@ -61,3 +84,4 @@ assets/motions/phainon/raw/
 
 # test
 testsprite_tests/
+server/.data/companion.db
