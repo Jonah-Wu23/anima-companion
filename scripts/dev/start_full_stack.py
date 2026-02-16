@@ -26,6 +26,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="启动本地全链路：SenseVoice -> GPT-SoVITS -> 切权重 -> Server -> Web"
     )
+    parser.add_argument(
+        "--frontend-backend-only",
+        action="store_true",
+        help="仅启动前后端（Server + Web），跳过 SenseVoice / GPT-SoVITS / 切权重。",
+    )
     parser.add_argument("--repo-root", type=Path, default=repo_root)
     parser.add_argument("--sensevoice-root", type=Path, default=Path(r"E:\AI\VTT\SenseVoice"))
     parser.add_argument("--device", default="cuda:0")
@@ -172,6 +177,7 @@ def run_blocking(pwsh: str, script: Path, args: list[str], dry_run: bool) -> Non
 
 def main() -> int:
     args = parse_args()
+    start_voice_stack = not args.frontend_backend_only
     server_port = FORCED_SERVER_PORT
     if args.server_port != FORCED_SERVER_PORT:
         print(
@@ -195,8 +201,10 @@ def main() -> int:
     start_server = repo_root / "scripts" / "dev" / "start_server.ps1"
     start_web = repo_root / "scripts" / "dev" / "start_web.ps1"
 
-    required = [start_sensevoice, start_gpt_sovits, start_server, start_web]
-    if not args.skip_weights:
+    required = [start_server, start_web]
+    if start_voice_stack:
+        required.extend([start_sensevoice, start_gpt_sovits])
+    if start_voice_stack and not args.skip_weights:
         required.append(set_weights)
     for path in required:
         if not path.exists():
@@ -206,42 +214,45 @@ def main() -> int:
     repo_ps = ps_quote(str(repo_root))
     sensevoice_root_ps = ps_quote(str(args.sensevoice_root))
 
-    if is_port_open("127.0.0.1", args.sensevoice_port):
-        print(f"[info] SenseVoice 端口 {args.sensevoice_port} 已在监听，跳过启动。")
+    if not start_voice_stack:
+        print("[info] 已启用仅前后端模式：跳过 SenseVoice / GPT-SoVITS / 切权重。")
     else:
-        command = (
-            f"Set-Location {repo_ps}; "
-            f"& {ps_quote(str(start_sensevoice))} -Root {sensevoice_root_ps} -Device {ps_quote(args.device)}"
-        )
-        launch_in_new_console(pwsh, command, args.dry_run)
+        if is_port_open("127.0.0.1", args.sensevoice_port):
+            print(f"[info] SenseVoice 端口 {args.sensevoice_port} 已在监听，跳过启动。")
+        else:
+            command = (
+                f"Set-Location {repo_ps}; "
+                f"& {ps_quote(str(start_sensevoice))} -Root {sensevoice_root_ps} -Device {ps_quote(args.device)}"
+            )
+            launch_in_new_console(pwsh, command, args.dry_run)
+            if not args.dry_run:
+                print(f"[wait] 等待 SenseVoice 端口 {args.sensevoice_port} 就绪...")
+                if not wait_port("127.0.0.1", args.sensevoice_port, args.wait_timeout):
+                    print("[error] SenseVoice 未在超时时间内就绪。", file=sys.stderr)
+                    return 1
+
+        if is_port_open("127.0.0.1", args.gpt_sovits_port):
+            print(f"[info] GPT-SoVITS 端口 {args.gpt_sovits_port} 已在监听，跳过启动。")
+        else:
+            command = f"Set-Location {repo_ps}; & {ps_quote(str(start_gpt_sovits))}"
+            launch_in_new_console(pwsh, command, args.dry_run)
+            if not args.dry_run:
+                print(f"[wait] 等待 GPT-SoVITS 端口 {args.gpt_sovits_port} 就绪...")
+                if not wait_port("127.0.0.1", args.gpt_sovits_port, args.wait_timeout):
+                    print("[error] GPT-SoVITS 未在超时时间内就绪。", file=sys.stderr)
+                    return 1
+
         if not args.dry_run:
-            print(f"[wait] 等待 SenseVoice 端口 {args.sensevoice_port} 就绪...")
-            if not wait_port("127.0.0.1", args.sensevoice_port, args.wait_timeout):
-                print("[error] SenseVoice 未在超时时间内就绪。", file=sys.stderr)
+            print("[wait] 等待 GPT-SoVITS /speakers_list 可用...")
+            speakers_url = f"http://127.0.0.1:{args.gpt_sovits_port}/speakers_list"
+            if not wait_http_ok(speakers_url, args.wait_timeout):
+                print("[error] GPT-SoVITS /speakers_list 检查失败。", file=sys.stderr)
                 return 1
 
-    if is_port_open("127.0.0.1", args.gpt_sovits_port):
-        print(f"[info] GPT-SoVITS 端口 {args.gpt_sovits_port} 已在监听，跳过启动。")
-    else:
-        command = f"Set-Location {repo_ps}; & {ps_quote(str(start_gpt_sovits))}"
-        launch_in_new_console(pwsh, command, args.dry_run)
-        if not args.dry_run:
-            print(f"[wait] 等待 GPT-SoVITS 端口 {args.gpt_sovits_port} 就绪...")
-            if not wait_port("127.0.0.1", args.gpt_sovits_port, args.wait_timeout):
-                print("[error] GPT-SoVITS 未在超时时间内就绪。", file=sys.stderr)
-                return 1
-
-    if not args.dry_run:
-        print("[wait] 等待 GPT-SoVITS /speakers_list 可用...")
-        speakers_url = f"http://127.0.0.1:{args.gpt_sovits_port}/speakers_list"
-        if not wait_http_ok(speakers_url, args.wait_timeout):
-            print("[error] GPT-SoVITS /speakers_list 检查失败。", file=sys.stderr)
-            return 1
-
-    if args.skip_weights:
-        print("[info] 已跳过权重切换（--skip-weights）。")
-    else:
-        run_blocking(pwsh, set_weights, [], args.dry_run)
+        if args.skip_weights:
+            print("[info] 已跳过权重切换（--skip-weights）。")
+        else:
+            run_blocking(pwsh, set_weights, [], args.dry_run)
 
     server_is_listening = is_port_open("127.0.0.1", server_port) or is_port_open(
         "0.0.0.0",
@@ -286,12 +297,18 @@ def main() -> int:
         launch_in_new_console(pwsh, command, args.dry_run)
 
     print("[done] 启动流程已执行。")
-    print(
+    hint = (
         f"[hint] 预期地址：Web=http://localhost:{args.web_port} "
-        f"Server=http://127.0.0.1:{server_port} "
-        f"SenseVoice=http://127.0.0.1:{args.sensevoice_port} "
-        f"GPT-SoVITS=http://127.0.0.1:{args.gpt_sovits_port}"
+        f"Server=http://127.0.0.1:{server_port}"
     )
+    if start_voice_stack:
+        hint += (
+            f" SenseVoice=http://127.0.0.1:{args.sensevoice_port} "
+            f"GPT-SoVITS=http://127.0.0.1:{args.gpt_sovits_port}"
+        )
+    else:
+        hint += "（仅前后端模式，未启动 SenseVoice / GPT-SoVITS）"
+    print(hint)
     return 0
 
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js';
+import { MMDAnimationHelper } from '@/lib/vendor/mmd/MMDAnimationHelper.js';
 import { LipSyncController, type LipSyncMorphs } from '@/lib/mmd/lipsync';
 
 interface ClipPlaybackOptions {
@@ -10,6 +10,21 @@ interface ClipPlaybackOptions {
 interface MMDAnimationManagerOptions {
   fadeDuration?: number;
   lipSyncMorphs?: LipSyncMorphs;
+}
+
+interface AnimationActionSnapshot {
+  name: string;
+  time: number;
+  weight: number;
+  enabled: boolean;
+  loop: THREE.AnimationActionLoopStyles;
+  clampWhenFinished: boolean;
+  paused: boolean;
+}
+
+export interface AnimationSnapshot {
+  currentActionName: string | null;
+  actions: AnimationActionSnapshot[];
 }
 
 type HelperObject = {
@@ -103,6 +118,64 @@ export class MMDAnimationManager {
       this.lipSync.setMorphs(morphs);
     }
     this.lipSync.setEnergy(energy);
+  }
+
+  captureSnapshot(): AnimationSnapshot {
+    const actions: AnimationActionSnapshot[] = [];
+    this.actions.forEach((action, name) => {
+      actions.push({
+        name,
+        time: action.time,
+        weight: action.getEffectiveWeight(),
+        enabled: action.enabled,
+        loop: action.loop,
+        clampWhenFinished: action.clampWhenFinished,
+        paused: action.paused,
+      });
+    });
+
+    return {
+      currentActionName: this.currentActionName,
+      actions,
+    };
+  }
+
+  restoreSnapshot(snapshot: AnimationSnapshot | null, fadeDuration = 0): void {
+    if (!snapshot) {
+      return;
+    }
+
+    if (snapshot.currentActionName && this.clips.has(snapshot.currentActionName)) {
+      this.play(snapshot.currentActionName, fadeDuration);
+    }
+
+    snapshot.actions.forEach((entry) => {
+      const clip = this.clips.get(entry.name);
+      if (!clip) {
+        return;
+      }
+
+      const action = this.getAction(entry.name, clip);
+      action.enabled = entry.enabled;
+      action.loop = entry.loop;
+      action.clampWhenFinished = entry.clampWhenFinished;
+      action.paused = entry.paused;
+      action.setEffectiveWeight(entry.weight);
+
+      if (clip.duration > 0) {
+        action.time = THREE.MathUtils.euclideanModulo(entry.time, clip.duration);
+      } else {
+        action.time = Math.max(0, entry.time);
+      }
+
+      if (entry.weight > 0 || entry.name === snapshot.currentActionName) {
+        action.play();
+      }
+    });
+
+    if (snapshot.currentActionName && this.clips.has(snapshot.currentActionName)) {
+      this.currentActionName = snapshot.currentActionName;
+    }
   }
 
   dispose(): void {

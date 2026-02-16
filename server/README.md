@@ -36,3 +36,29 @@
 - `POST /v1/chat/text`：文本对话（含关系值增量与记忆写入）。
 - `POST /v1/chat/voice`：`audio + session_id + persona_id + lang` 一站式语音对话，返回 base64 音频。
 - `POST /v1/user/clear`：按 `session_id` 清空 `messages/memories/relationship`。
+
+## P3 语音后端兼容与降级
+
+- ASR fallback: `sensevoice_http -> fun_asr_realtime -> 提示改用文本输入`
+- TTS fallback: `qwen_clone_tts -> gpt_sovits -> 纯文本降级`
+- Provider 可用性探测接口:
+  - `GET /v1/asr/providers`
+  - `GET /v1/tts/providers`
+
+### Fun-ASR 实时识别（Web 音频流）
+
+- WebSocket: `GET ws://<host>/v1/asr/fun/realtime/ws`
+- 推荐 100ms/帧，`pcm + 16kHz`
+- 客户端发送:
+  - 二进制帧: 音频数据
+  - 文本指令: `stop` / `[done]` / `end`
+- 服务端回推事件: `open/result/error/complete/close`
+- 协议说明查询: `GET /v1/asr/fun/realtime/usage`
+
+### 千问声音复刻（Voice Enrollment）
+
+- 创建或复用音色: `POST /v1/tts/qwen/enroll`
+- 查询音色列表: `GET /v1/tts/qwen/voices`
+- 删除音色: `DELETE /v1/tts/qwen/voice?voice_id=...`
+- 兼容旧路由: `/v1/tts/cosyvoice/enroll`、`/v1/tts/cosyvoice/voices` 仍可用，但底层已切换为千问接口。
+- 重要: 复刻音频必须为公网可访问 URL。可先将 `assets/audio/references/` 中参考音频上传到 OSS，再配置 `QWEN_ENROLL_AUDIO_URL`。

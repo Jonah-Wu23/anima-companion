@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { PerspectiveCamera, Grid } from '@react-three/drei';
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { PerspectiveCamera, useGLTF, Sky, Environment } from '@react-three/drei';
+import { EffectComposer, Bloom, DepthOfField, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import MMDCharacter from '@/components/MMDCharacter';
 import ModelLoadingIndicator from '@/components/ModelLoadingIndicator';
@@ -10,15 +11,16 @@ import type { ModelStatus } from '@/lib/api/types';
 import { useAvatarStore } from '@/lib/store/avatarStore';
 import { usePipelineStore, type PipelineStage } from '@/lib/store/pipelineStore';
 import { useSettingsStore } from '@/lib/store/settingsStore';
+import { resolveModelPmxPathById } from '@/lib/wardrobe/model-registry';
+import { useWardrobeStore } from '@/lib/store/wardrobeStore';
 
-const DEFAULT_MODEL_PATH = '/api/local-files/assets/models/Phainon/星穹铁道—白厄3.pmx';
 const DEFAULT_MANIFEST_PATH = '/api/local-files/configs/motions/phainon-motion-manifest.json';
 
 // Blender 相机参数（Z-up, XYZ 欧拉）
 const BLENDER_CAMERA_POSITION: [number, number, number] = [-0.004086, -5.34387, 1.06392];
 const BLENDER_CAMERA_ROTATION_DEG: [number, number, number] = [89.0057, -0.00001, -0.533334];
-const CAMERA_VERTICAL_OFFSET = 0.98;
-const CAMERA_FORWARD_OFFSET = 0.95;
+const CAMERA_VERTICAL_OFFSET = 1.1;
+const CAMERA_FORWARD_OFFSET = 0.3;
 const TALK8_CAMERA_FORWARD_EXTRA_OFFSET = 0.5;
 const TALK8_MOTION_IDS = new Set(['phainon_bg_loop_chat_015', 'phainon_bg_loop_chat_016']);
 
@@ -52,6 +54,9 @@ const CAMERA_POSITION: [number, number, number] = [
 const CAMERA_FOCAL_LENGTH_MM = 50;
 const CAMERA_SENSOR_MM = 36;
 const MMD_MODEL_SCALE = 0.12;
+const ROOM_SCENE_SCALE = 1;
+const ROOM_SCENE_BACKWARD_OFFSET = 2.5;
+const ROOM_SCENE_PATH = '/assets/scenes/scene.glb';
 
 const EMOTION_COLORS: Record<string, string> = {
   neutral: '#FFD54F',
@@ -141,46 +146,76 @@ function SunnyBubble() {
   );
 }
 
-// 优化的灯光配置：降低强度避免过曝
-function ImprovedLighting() {
+// 午后阳光氛围灯光：温暖、通透、田园感
+function SunnyAfternoonLighting() {
   return (
     <>
-      {/* 环境光：中等强度，避免过曝 */}
-      <ambientLight intensity={0.55} color="#ffffff" />
+      {/* 基础环境光：暖调，模拟室内漫反射 */}
+      <ambientLight intensity={0.42} color="#FFF8E7" />
       
-      {/* 主光源：方向光 */}
+      {/* 主光源：午后斜阳，暖金色，从窗户方向射入 */}
       <directionalLight 
-        position={[6, 8, 5]} 
-        intensity={1.0} 
-        color="#ffffff"
+        position={[-8, 6, 4]} 
+        intensity={1.2} 
+        color="#FFE4B5"
+        castShadow
+        shadow-mapSize={[1024, 1024]}
       />
       
-      {/* 补光：柔化阴影 */}
+      {/* 补光：柔化阴影，冷调平衡 */}
       <directionalLight 
-        position={[-5, 3, -5]} 
-        intensity={0.4} 
-        color="#F0F8FF" 
+        position={[4, 2, -6]} 
+        intensity={0.28} 
+        color="#E8F4FF" 
+      />
+
+      {/* 半球光：天空蓝到暖地的渐变 */}
+      <hemisphereLight 
+        intensity={0.35} 
+        groundColor="#F5E6D3" 
+        color="#87CEEB" 
+      />
+      
+      {/* 点光源：模拟室内温馨感 */}
+      <pointLight
+        position={[2, 3, 2]}
+        intensity={0.3}
+        color="#FFDAB9"
+        distance={8}
       />
     </>
   );
 }
 
-// 简化的地面网格
-function SimpleGrid() {
+// 蓝天白云天空盒
+function BlueSky() {
   return (
-    <Grid
-      position={[0, 0, 0]}
-      args={[20, 20]}
-      cellSize={1}
-      cellThickness={0.5}
-      cellColor="#CCCCCC"
-      sectionSize={5}
-      sectionThickness={1}
-      sectionColor="#AAAAAA"
-      fadeDistance={25}
-      fadeStrength={1}
-      infiniteGrid={true}
+    <Sky
+      distance={450000}
+      sunPosition={[-8, 4, 4]}
+      inclination={0.49}
+      azimuth={0.25}
+      mieCoefficient={0.005}
+      mieDirectionalG={0.8}
+      rayleigh={0.8}
+      turbidity={3}
     />
+  );
+}
+
+function RoomScene() {
+  const { scene } = useGLTF(ROOM_SCENE_PATH);
+  return (
+    <>
+      {/* 窗外蓝天白云：天花板会遮挡顶部，窗外可见蓝天 */}
+      <BlueSky />
+      <primitive
+        object={scene}
+        scale={[ROOM_SCENE_SCALE, ROOM_SCENE_SCALE, ROOM_SCENE_SCALE]}
+        rotation={[0, -3 * Math.PI / 4, 0]}
+        position={[0, 0, -ROOM_SCENE_BACKWARD_OFFSET]}
+      />
+    </>
   );
 }
 
@@ -214,6 +249,12 @@ export default function Viewport3D() {
   const setModelStatus = useAvatarStore((state) => state.setModelStatus);
   const setCurrentMotion = useAvatarStore((state) => state.setCurrentMotion);
   const setModelProgress = useAvatarStore((state) => state.setModelProgress);
+  const currentModelId = useWardrobeStore((state) => state.currentModelId);
+  const setWardrobeStatus = useWardrobeStore((state) => state.setStatus);
+  const setWardrobeLoadingProgress = useWardrobeStore((state) => state.setLoadingProgress);
+  const setWardrobeErrorMessage = useWardrobeStore((state) => state.setErrorMessage);
+
+  const activeModelPath = useMemo(() => resolveModelPmxPathById(currentModelId), [currentModelId]);
 
   useEffect(() => {
     setSceneStatus('loading');
@@ -223,17 +264,31 @@ export default function Viewport3D() {
   }, [setModelProgress, setModelStatus, setSceneStatus]);
 
   const handleStatusChange = useCallback(
-    (status: ModelStatus) => {
+    (status: ModelStatus, detail?: string) => {
       setModelStatus(status);
+      if (status === 'loading') {
+        setWardrobeStatus('switching');
+        setWardrobeErrorMessage(null);
+        return;
+      }
+      if (status === 'ready') {
+        setWardrobeStatus('idle');
+        setWardrobeLoadingProgress(100);
+        setWardrobeErrorMessage(null);
+        return;
+      }
+      setWardrobeStatus('error');
+      setWardrobeErrorMessage(detail ?? '模型加载失败');
     },
-    [setModelStatus]
+    [setModelStatus, setWardrobeErrorMessage, setWardrobeLoadingProgress, setWardrobeStatus]
   );
 
   const handleProgressChange = useCallback(
     (progress: number) => {
       setModelProgress(progress);
+      setWardrobeLoadingProgress(progress);
     },
-    [setModelProgress]
+    [setModelProgress, setWardrobeLoadingProgress]
   );
 
   const shouldRenderMMD = modelStatus !== 'error';
@@ -252,6 +307,8 @@ export default function Viewport3D() {
         gl={{
           alpha: true,
           antialias: false,
+          // 相册截图依赖 canvas.toBlob，需保留绘制缓冲避免黑帧
+          preserveDrawingBuffer: true,
           // 使用 NoToneMapping 避免颜色压缩，更好地还原 MMD 贴图
           toneMapping: THREE.NoToneMapping,
           outputColorSpace: THREE.SRGBColorSpace,
@@ -261,32 +318,34 @@ export default function Viewport3D() {
         <PerspectiveCamera
           makeDefault
           position={CAMERA_POSITION}
-          quaternion={CAMERA_QUATERNION}
           near={0.1}
           far={1000}
           onUpdate={(camera) => {
+            camera.quaternion.copy(CAMERA_QUATERNION);
             camera.filmGauge = CAMERA_SENSOR_MM;
             camera.setFocalLength(CAMERA_FOCAL_LENGTH_MM);
             camera.updateProjectionMatrix();
           }}
         />
         <CameraPoseController />
-        {/* 背景改回淡蓝色 */}
-        <color attach="background" args={['#EAF5FF']} />
-        {/* 添加淡雾效 */}
-        <fog attach="fog" args={['#EAF5FF', 8, 25]} />
+        {/* 背景：与室内墙壁颜色相近的浅灰色，融入房间 */}
+        <color attach="background" args={['#c5c8cc']} />
+        {/* 雾效：淡蓝雾气，增强空气感 */}
+        <fog attach="fog" args={['#B0D9F0', 12, 35]} />
         
-        {/* 优化后的灯光系统 */}
-        <ImprovedLighting />
-        
-        {/* 地面网格 */}
-        <SimpleGrid />
+        {/* 午后阳光氛围灯光 */}
+        <SunnyAfternoonLighting />
+
+        <Suspense fallback={null}>
+          <RoomScene />
+        </Suspense>
 
         <group position={[0, 0.5, 0]}>
           {shouldRenderMMD && (
             <group visible={modelStatus === 'ready'} scale={[MMD_MODEL_SCALE, MMD_MODEL_SCALE, MMD_MODEL_SCALE]}>
               <MMDCharacter
-                modelPath={DEFAULT_MODEL_PATH}
+                modelId={currentModelId}
+                modelPath={activeModelPath}
                 manifestPath={DEFAULT_MANIFEST_PATH}
                 onStatusChange={handleStatusChange}
                 onLoadProgress={handleProgressChange}
@@ -296,6 +355,23 @@ export default function Viewport3D() {
           )}
           {showBubbleFallback && <SunnyBubble />}
         </group>
+        
+        {/* 后期效果：温暖辉光 + 边缘暗角（已移除景深） */}
+        <EffectComposer>
+          {/* 温暖辉光：模拟午后阳光的光晕感 */}
+          <Bloom 
+            intensity={0.4} 
+            luminanceThreshold={0.65} 
+            luminanceSmoothing={0.3}
+            mipmapBlur
+          />
+          {/* 边缘暗角：聚焦视线在角色 */}
+          <Vignette 
+            offset={0.3} 
+            darkness={0.4} 
+            eskil={false} 
+          />
+        </EffectComposer>
       </Canvas>
 
       {modelStatus === 'loading' && (
@@ -306,3 +382,5 @@ export default function Viewport3D() {
     </div>
   );
 }
+
+useGLTF.preload(ROOM_SCENE_PATH);

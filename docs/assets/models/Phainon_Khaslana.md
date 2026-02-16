@@ -1,5 +1,7 @@
 # MMD Model Registry (Phainon_Khaslana)
 
+- model_id: `model.Phainon_Khaslana`
+
 - 默认用途: 内部验证（internal validation only）
 - 校验日期: 2026-02-14
 - 规范目录名: `assets/models/Phainon_Khaslana/`（计划从 `mmd_download/models/卡厄斯兰那_1109_by_FixEll_fe82a555dc5f6cda5c26676ae7c905ef/` 迁移）
@@ -32,3 +34,11 @@
 - 立绘设计: 白弈
 - 模型调整: Asahi_
 - 模型绑定: FixEll
+
+## 工程使用边界
+
+- 内部验证: 允许（P3 阶段默认）
+- 对外发布: 仅在完成署名校对并二次复核许可条款后可进入发布候选
+- 可改造范围: 仅限骨骼/权重/物理/贴图优化与性能修复，不得拆件重组到其他角色模型
+- 上线前置: 在角色配置中固定 `model_id` 与资源路径映射，并完成许可复核留档
+

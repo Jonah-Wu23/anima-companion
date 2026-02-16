@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore } from '@/lib/store/pipelineStore';
+import { useAvatarStore } from '@/lib/store/avatarStore';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar';
 import { Sparkles, MessageSquare, Mic, Smile } from 'lucide-react';
@@ -30,6 +31,8 @@ export function MessagePanel() {
   const pipelineStage = usePipelineStore((state) => state.stage);
   const setStage = usePipelineStore((state) => state.setStage);
   const setError = usePipelineStore((state) => state.setError);
+  const setAvatarAnimation = usePipelineStore((state) => state.setAvatarAnimation);
+  const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -66,12 +69,14 @@ export function MessagePanel() {
         createdAt: Date.now(),
         emotion: response.emotion,
       });
+      setAvatarEmotion(response.emotion);
+      setAvatarAnimation(response.animation);
       setStage('idle');
     } catch (error) {
       setError(extractApiErrorMessage(error, '发送失败，请重试'));
       setStage('error');
     }
-  }, [addMessage, isBusy, sessionId, setError, setStage]);
+  }, [addMessage, isBusy, sessionId, setAvatarAnimation, setAvatarEmotion, setError, setStage]);
 
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden bg-transparent">
@@ -134,7 +139,7 @@ export function MessagePanel() {
               )}>
                 {/* Avatar */}
                 <Avatar className="w-8 h-8 mt-1 border border-white shadow-sm">
-                  {!isUser && <AvatarImage src="/assets/avatar-placeholder.svg" alt="白厄头像" />}
+                  {!isUser && <AvatarImage src="/assets/phainon-profile.jpg" alt="白厄头像" />}
                   <AvatarFallback className={isUser ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-pink-600"}>
                     {isUser ? "你" : "白"}
                   </AvatarFallback>
@@ -184,7 +189,7 @@ export function MessagePanel() {
           <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-4 duration-300">
              <div className="flex max-w-[85%] gap-3 flex-row">
                 <Avatar className="w-8 h-8 mt-1 border border-white shadow-sm">
-                  <AvatarImage src="/assets/avatar-placeholder.svg" alt="白厄头像" />
+                  <AvatarImage src="/assets/phainon-profile.jpg" alt="白厄头像" />
                   <AvatarFallback className="bg-pink-100 text-pink-600">白</AvatarFallback>
                 </Avatar>
                 

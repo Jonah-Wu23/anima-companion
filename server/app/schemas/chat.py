@@ -27,6 +27,9 @@ class ChatTextRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     persona_id: str = Field(..., min_length=1)
     user_text: str = Field(..., min_length=1)
+    tts_provider: Literal["auto", "qwen_clone_tts", "gpt_sovits", "cosyvoice_tts"] = "qwen_clone_tts"
+    qwen_voice_id: str = ""
+    qwen_target_model: str = ""
 
 
 class ChatTextResponse(BaseModel):
@@ -42,14 +45,17 @@ class ChatTextVoiceResponse(ChatTextResponse):
     tts_media_type: str
     tts_audio_base64: str
     tts_error: str | None = None
+    tts_provider: str | None = None
 
 
 class ChatVoiceResponse(BaseModel):
     transcript_text: str
+    asr_provider: str | None = None
     assistant_text: str
     tts_media_type: str
     tts_audio_base64: str
     tts_error: str | None = None
+    tts_provider: str | None = None
     emotion: Emotion = "neutral"
     animation: Animation = "speak"
 

@@ -1,0 +1,10 @@
+{
+  "default": {
+    "voice_id": "cosyvoice-v3-plus-phainon-2f28dc4e3e124959a1a6475c2ab12f42",
+    "target_model": "cosyvoice-v3-plus",
+    "status": "OK",
+    "source": "enrollment",
+    "audio_url": "https://phainon-anima-companion.oss-cn-shanghai.aliyuncs.com/phainon_no_echo_merged.wav",
+    "updated_at": "2026-02-15T11:07:36Z"
+  }
+}

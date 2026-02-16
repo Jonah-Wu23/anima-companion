@@ -1,16 +1,27 @@
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Camera, Images, Settings, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage, AvatarStatus } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 interface TopBarProps {
   onOpenSettings: () => void;
+  onOpenAlbum?: () => void;
+  onCaptureMoment?: () => void;
+  captureDisabled?: boolean;
   className?: string;
   status?: string;
 }
 
-export function TopBar({ onOpenSettings, className, status = "陪伴中" }: TopBarProps) {
+export function TopBar({
+  onOpenSettings,
+  onOpenAlbum,
+  onCaptureMoment,
+  captureDisabled = false,
+  className,
+  status = "陪伴中",
+}: TopBarProps) {
   return (
     <header
       className={cn(
@@ -23,8 +34,8 @@ export function TopBar({ onOpenSettings, className, status = "陪伴中" }: TopB
       {/* Left: Avatar + Info */}
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Avatar className="h-9 w-9 lg:h-10 lg:w-10 ring-2 ring-white/50 shadow-sm transition-transform hover:scale-105">
-            <AvatarImage src="/assets/avatar-placeholder.svg" alt="白厄" />
+            <Avatar className="h-9 w-9 lg:h-10 lg:w-10 ring-2 ring-white/50 shadow-sm transition-transform hover:scale-105">
+            <AvatarImage src="/assets/phainon-profile.jpg" alt="白厄" />
             <AvatarFallback className="bg-gradient-to-br from-sky-400 to-blue-500 text-white text-xs font-medium">
               白
             </AvatarFallback>
@@ -47,6 +58,39 @@ export function TopBar({ onOpenSettings, className, status = "陪伴中" }: TopB
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1">
+        {onCaptureMoment && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onCaptureMoment}
+            disabled={captureDisabled}
+            className="rounded-full hover:bg-white/50 text-slate-600 hover:text-sky-600 transition-colors disabled:opacity-50"
+            aria-label="截图并保存到回忆相册"
+          >
+            <Camera className="w-5 h-5" />
+          </Button>
+        )}
+        <Link href="/wardrobe">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-white/50 text-slate-600 hover:text-sky-600 transition-colors"
+            aria-label="换装间"
+          >
+            <Sparkles className="w-5 h-5" />
+          </Button>
+        </Link>
+        {onOpenAlbum && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenAlbum}
+            className="rounded-full hover:bg-white/50 text-slate-600 hover:text-sky-600 transition-colors"
+            aria-label="打开回忆相册"
+          >
+            <Images className="w-5 h-5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

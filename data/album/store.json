@@ -1,0 +1,429 @@
+{
+  "version": 1,
+  "settings": {
+    "privacyEnabled": true,
+    "updatedAt": "2026-02-16T04:45:49.438Z"
+  },
+  "items": [
+    {
+      "id": "96418067-9bd9-4dc6-ad67-c8124b4ebbad",
+      "filename": "album-photo-20250725-184921-001.jpg",
+      "title": "album photo 20250725 184921 001",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1434764,
+      "capturedAt": "2025-07-25T10:49:21.601Z",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "updatedAt": "2026-02-16T04:45:49.439Z"
+    },
+    {
+      "id": "7ace30fd-19ea-455d-a08c-140af8f19092",
+      "filename": "album-photo-20250725-184944-002.jpg",
+      "title": "album photo 20250725 184944 002",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1197482,
+      "capturedAt": "2025-07-25T10:49:44.416Z",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "updatedAt": "2026-02-16T04:45:49.439Z"
+    },
+    {
+      "id": "f0cddbf7-1953-4ab7-996f-547a738887a1",
+      "filename": "album-photo-20250725-184947-003.jpg",
+      "title": "album photo 20250725 184947 003",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1436053,
+      "capturedAt": "2025-07-25T10:49:47.648Z",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "updatedAt": "2026-02-16T04:45:49.439Z"
+    },
+    {
+      "id": "4cd9ddca-7090-49f4-a231-2d4a286ad570",
+      "filename": "album-photo-20250725-184956-004.jpg",
+      "title": "album photo 20250725 184956 004",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1343698,
+      "capturedAt": "2025-07-25T10:49:56.910Z",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "updatedAt": "2026-02-16T04:45:49.439Z"
+    },
+    {
+      "id": "d45a5204-b1f5-40b4-9c34-1503cd019dc0",
+      "filename": "album-photo-20250725-185004-005.jpg",
+      "title": "album photo 20250725 185004 005",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1695274,
+      "capturedAt": "2025-07-25T10:50:04.863Z",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "updatedAt": "2026-02-16T04:45:49.440Z"
+    },
+    {
+      "id": "68c6802e-d3a3-4ed4-a692-a9421b2dca36",
+      "filename": "album-photo-20250725-185028-006.jpg",
+      "title": "album photo 20250725 185028 006",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 819908,
+      "capturedAt": "2025-07-25T10:50:28.598Z",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "updatedAt": "2026-02-16T04:45:49.440Z"
+    },
+    {
+      "id": "3e0bf120-ed97-40d5-ae70-e0e438650c78",
+      "filename": "album-photo-20250725-185031-007.jpg",
+      "title": "album photo 20250725 185031 007",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 541612,
+      "capturedAt": "2025-07-25T10:50:31.497Z",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "updatedAt": "2026-02-16T04:45:49.440Z"
+    },
+    {
+      "id": "3c455d1c-347f-492e-925a-a9f158dea1c0",
+      "filename": "album-photo-20250725-185034-008.jpg",
+      "title": "album photo 20250725 185034 008",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 519059,
+      "capturedAt": "2025-07-25T10:50:34.635Z",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "updatedAt": "2026-02-16T04:45:49.440Z"
+    },
+    {
+      "id": "0f09d89a-8b15-4a5f-b37c-58f87edf5c43",
+      "filename": "album-photo-20250725-185037-009.jpg",
+      "title": "album photo 20250725 185037 009",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 422504,
+      "capturedAt": "2025-07-25T10:50:37.223Z",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "updatedAt": "2026-02-16T04:45:49.441Z"
+    },
+    {
+      "id": "77e644aa-1d36-40a7-b80f-3bafc44fa85c",
+      "filename": "album-photo-20250725-185045-010.jpg",
+      "title": "album photo 20250725 185045 010",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1190309,
+      "capturedAt": "2025-07-25T10:50:45.809Z",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "updatedAt": "2026-02-16T04:45:49.441Z"
+    },
+    {
+      "id": "189876fb-1a31-4089-8cb4-cfcb36cb592f",
+      "filename": "album-photo-20250725-185231-011.jpg",
+      "title": "album photo 20250725 185231 011",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1461198,
+      "capturedAt": "2025-07-25T10:52:31.528Z",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "updatedAt": "2026-02-16T04:45:49.441Z"
+    },
+    {
+      "id": "778d8c1b-802c-4c6d-aa8d-cef8d833926e",
+      "filename": "album-photo-20250725-185234-012.jpg",
+      "title": "album photo 20250725 185234 012",
+      "source": "imported",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 1631050,
+      "capturedAt": "2025-07-25T10:52:34.015Z",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "updatedAt": "2026-02-16T04:45:49.441Z"
+    },
+    {
+      "id": "f29e10c1-ffae-4156-9783-7749d6628177",
+      "filename": "album-shot-20250725-185533-013.png",
+      "title": "album shot 20250725 185533 013",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 4310555,
+      "capturedAt": "2025-07-25T10:55:33.289Z",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "updatedAt": "2026-02-16T04:45:49.441Z"
+    },
+    {
+      "id": "671ddf69-c6ad-484b-9cba-e51081d86df4",
+      "filename": "album-shot-20250725-185954-014.png",
+      "title": "album shot 20250725 185954 014",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 4887160,
+      "capturedAt": "2025-07-25T10:59:54.107Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "571a195c-6fb2-4d6d-9b04-3c9501225de8",
+      "filename": "album-shot-20250725-190001-015.png",
+      "title": "album shot 20250725 190001 015",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 4856917,
+      "capturedAt": "2025-07-25T11:00:01.577Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "0fdcaac4-8575-4dfa-be50-3ca5fb00f42d",
+      "filename": "album-shot-20250725-190023-016.png",
+      "title": "album shot 20250725 190023 016",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 5039598,
+      "capturedAt": "2025-07-25T11:00:23.408Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "9db363be-8668-427f-a1ec-195950602090",
+      "filename": "album-shot-20250725-190034-017.png",
+      "title": "album shot 20250725 190034 017",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 5334999,
+      "capturedAt": "2025-07-25T11:00:34.176Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "241024e7-f732-4701-9654-743e36350db7",
+      "filename": "album-shot-20250725-190038-018.png",
+      "title": "album shot 20250725 190038 018",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 4910843,
+      "capturedAt": "2025-07-25T11:00:38.427Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "74993d54-d0aa-4e72-9c32-bdc78a417e59",
+      "filename": "album-shot-20250725-190059-019.png",
+      "title": "album shot 20250725 190059 019",
+      "source": "imported",
+      "mimeType": "image/png",
+      "sizeBytes": 3436658,
+      "capturedAt": "2025-07-25T11:00:59.224Z",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "updatedAt": "2026-02-16T04:45:49.442Z"
+    },
+    {
+      "id": "50478170-1cf2-40c2-ba5b-31f1385b3655",
+      "filename": "album-shot-20260216-132942-c076ebbe.png",
+      "title": "对白瞬间 2026/2/16 13:29:42",
+      "source": "screenshot",
+      "mimeType": "image/png",
+      "sizeBytes": 632324,
+      "capturedAt": "2026-02-16T05:29:42.111Z",
+      "createdAt": "2026-02-16T05:29:42.111Z",
+      "updatedAt": "2026-02-16T05:29:42.111Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "38c56696-3489-4b27-9356-43e6f91e646b",
+      "createdAt": "2026-02-16T05:29:42.111Z",
+      "type": "screenshot_captured",
+      "itemId": "50478170-1cf2-40c2-ba5b-31f1385b3655",
+      "note": "用户在主页拍摄截图",
+      "payload": {
+        "width": 1024,
+        "height": 1187
+      }
+    },
+    {
+      "id": "0c88f481-3d25-4f1d-aee3-fd27adc66aad",
+      "createdAt": "2026-02-16T05:29:30.262Z",
+      "type": "item_deleted",
+      "itemId": "a9657a50-4dd7-4f32-88fa-0960a1344b5e",
+      "note": "已删除图片：album-shot-20260216-132908-11c6b938.png"
+    },
+    {
+      "id": "fc92cc3e-9544-42c6-a8ef-b4130c6f30cb",
+      "createdAt": "2026-02-16T05:29:08.105Z",
+      "type": "screenshot_captured",
+      "itemId": "a9657a50-4dd7-4f32-88fa-0960a1344b5e",
+      "note": "用户在主页拍摄截图",
+      "payload": {
+        "width": 1024,
+        "height": 1187
+      }
+    },
+    {
+      "id": "ebd2716d-a84e-4bf1-b234-e5b3c7086e35",
+      "createdAt": "2026-02-16T05:23:16.953Z",
+      "type": "item_deleted",
+      "itemId": "b3d07587-bdf5-4471-99ac-ce60da234be7",
+      "note": "已删除图片：album-shot-20260216-132233-58fa20f4.png"
+    },
+    {
+      "id": "47bf0f13-1eb1-4fb4-a917-810cad88240b",
+      "createdAt": "2026-02-16T05:23:14.218Z",
+      "type": "item_deleted",
+      "itemId": "002eaf9d-c62b-4256-a68a-6ae299090502",
+      "note": "已删除图片：album-shot-20260216-132256-64a11542.png"
+    },
+    {
+      "id": "29e4ec77-45ba-429c-9c81-0bf9eeb4eb84",
+      "createdAt": "2026-02-16T05:22:56.891Z",
+      "type": "screenshot_captured",
+      "itemId": "002eaf9d-c62b-4256-a68a-6ae299090502",
+      "note": "用户在主页拍摄截图",
+      "payload": {
+        "width": 645,
+        "height": 725
+      }
+    },
+    {
+      "id": "033fe90c-cd8a-419f-a9a5-cbb74553aa35",
+      "createdAt": "2026-02-16T05:22:33.129Z",
+      "type": "screenshot_captured",
+      "itemId": "b3d07587-bdf5-4471-99ac-ce60da234be7",
+      "note": "用户在主页拍摄截图",
+      "payload": {
+        "width": 645,
+        "height": 748
+      }
+    },
+    {
+      "id": "19f54807-fdf4-4386-b5e1-96d26c0cd670",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "74993d54-d0aa-4e72-9c32-bdc78a417e59",
+      "note": "检测到新图片：album-shot-20250725-190059-019.png"
+    },
+    {
+      "id": "3e1f48e7-0d08-4372-a168-352dda0d177f",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "241024e7-f732-4701-9654-743e36350db7",
+      "note": "检测到新图片：album-shot-20250725-190038-018.png"
+    },
+    {
+      "id": "8ddf9bc8-d83d-41b0-bac1-81668cbf6866",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "9db363be-8668-427f-a1ec-195950602090",
+      "note": "检测到新图片：album-shot-20250725-190034-017.png"
+    },
+    {
+      "id": "3c2f4bd9-6ac4-4506-90e3-e131d4856106",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "0fdcaac4-8575-4dfa-be50-3ca5fb00f42d",
+      "note": "检测到新图片：album-shot-20250725-190023-016.png"
+    },
+    {
+      "id": "4e14df56-802c-48b9-a0a7-aa5ba321f002",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "571a195c-6fb2-4d6d-9b04-3c9501225de8",
+      "note": "检测到新图片：album-shot-20250725-190001-015.png"
+    },
+    {
+      "id": "93806ef7-a4f6-40f4-a60e-2d9ff1cbbaf1",
+      "createdAt": "2026-02-16T04:45:49.442Z",
+      "type": "photo_imported",
+      "itemId": "671ddf69-c6ad-484b-9cba-e51081d86df4",
+      "note": "检测到新图片：album-shot-20250725-185954-014.png"
+    },
+    {
+      "id": "e12db485-b00f-4443-8e4f-6e7bbf6dbb77",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "type": "photo_imported",
+      "itemId": "f29e10c1-ffae-4156-9783-7749d6628177",
+      "note": "检测到新图片：album-shot-20250725-185533-013.png"
+    },
+    {
+      "id": "f720d7db-205a-490b-b8eb-029e53ee21f1",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "type": "photo_imported",
+      "itemId": "778d8c1b-802c-4c6d-aa8d-cef8d833926e",
+      "note": "检测到新图片：album-photo-20250725-185234-012.jpg"
+    },
+    {
+      "id": "bbe26f4b-854a-4706-a860-d2d74d8ba897",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "type": "photo_imported",
+      "itemId": "189876fb-1a31-4089-8cb4-cfcb36cb592f",
+      "note": "检测到新图片：album-photo-20250725-185231-011.jpg"
+    },
+    {
+      "id": "4219745c-f0b4-4cc7-a690-36a8d8f40141",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "type": "photo_imported",
+      "itemId": "77e644aa-1d36-40a7-b80f-3bafc44fa85c",
+      "note": "检测到新图片：album-photo-20250725-185045-010.jpg"
+    },
+    {
+      "id": "63b6a233-e0f7-426d-a0bc-86ca47d2d9a6",
+      "createdAt": "2026-02-16T04:45:49.441Z",
+      "type": "photo_imported",
+      "itemId": "0f09d89a-8b15-4a5f-b37c-58f87edf5c43",
+      "note": "检测到新图片：album-photo-20250725-185037-009.jpg"
+    },
+    {
+      "id": "730ba323-6410-4f0d-a48e-3b43a5ce2877",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "type": "photo_imported",
+      "itemId": "3c455d1c-347f-492e-925a-a9f158dea1c0",
+      "note": "检测到新图片：album-photo-20250725-185034-008.jpg"
+    },
+    {
+      "id": "03c7d152-798b-4971-93cb-02e263a4f89e",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "type": "photo_imported",
+      "itemId": "3e0bf120-ed97-40d5-ae70-e0e438650c78",
+      "note": "检测到新图片：album-photo-20250725-185031-007.jpg"
+    },
+    {
+      "id": "130b63f9-fd1f-4ab7-ae65-ce6776ac3bd7",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "type": "photo_imported",
+      "itemId": "68c6802e-d3a3-4ed4-a692-a9421b2dca36",
+      "note": "检测到新图片：album-photo-20250725-185028-006.jpg"
+    },
+    {
+      "id": "67610b99-08a3-42ce-961c-bc0f4c673a61",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "type": "photo_imported",
+      "itemId": "d45a5204-b1f5-40b4-9c34-1503cd019dc0",
+      "note": "检测到新图片：album-photo-20250725-185004-005.jpg"
+    },
+    {
+      "id": "1d095373-9c12-4782-9d25-a83ccc3c3fca",
+      "createdAt": "2026-02-16T04:45:49.440Z",
+      "type": "photo_imported",
+      "itemId": "4cd9ddca-7090-49f4-a231-2d4a286ad570",
+      "note": "检测到新图片：album-photo-20250725-184956-004.jpg"
+    },
+    {
+      "id": "06e4aee9-3445-4031-aa03-5f7666f85840",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "type": "photo_imported",
+      "itemId": "f0cddbf7-1953-4ab7-996f-547a738887a1",
+      "note": "检测到新图片：album-photo-20250725-184947-003.jpg"
+    },
+    {
+      "id": "21662f8d-476f-49b8-b81a-a576cb1d3ef7",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "type": "photo_imported",
+      "itemId": "7ace30fd-19ea-455d-a08c-140af8f19092",
+      "note": "检测到新图片：album-photo-20250725-184944-002.jpg"
+    },
+    {
+      "id": "340ff4b9-2aeb-4c54-aee8-0743c4fd4d60",
+      "createdAt": "2026-02-16T04:45:49.439Z",
+      "type": "photo_imported",
+      "itemId": "96418067-9bd9-4dc6-ad67-c8124b4ebbad",
+      "note": "检测到新图片：album-photo-20250725-184921-001.jpg"
+    }
+  ]
+}

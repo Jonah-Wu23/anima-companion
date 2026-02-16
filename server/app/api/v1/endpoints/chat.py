@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.dependencies import get_session_store
 from app.repositories.session_store import SessionStore
 from app.schemas.chat import ChatTextRequest, ChatTextResponse, ChatTextVoiceResponse, ChatVoiceResponse
-from app.services.asr.sensevoice_client import SenseVoiceClientError, transcribe_wav
+from app.services.asr.asr_service import ASRServiceError, ASRUnavailableError, transcribe_with_fallback
 from app.services.dialogue.chat_service import (
     ChatServiceError,
     run_text_chat,
@@ -54,10 +54,14 @@ def chat_text_with_voice(
 
     tts_media_type = "audio/wav"
     tts_audio_base64 = ""
+    tts_provider: str | None = None
     tts_error: str | None = None
     try:
-        tts_media_type, tts_audio_base64 = synthesize_assistant_audio_base64(
-            str(result.get("assistant_raw_text", result["assistant_text"]))
+        tts_media_type, tts_audio_base64, tts_provider = synthesize_assistant_audio_base64(
+            str(result.get("assistant_raw_text", result["assistant_text"])),
+            force_tts_provider=req.tts_provider,
+            qwen_voice_id=req.qwen_voice_id,
+            qwen_target_model=req.qwen_target_model,
         )
     except ChatServiceError as exc:
         tts_error = str(exc)
@@ -73,6 +77,7 @@ def chat_text_with_voice(
         tts_media_type=tts_media_type,
         tts_audio_base64=tts_audio_base64,
         tts_error=tts_error,
+        tts_provider=tts_provider,
     )
 
 
@@ -82,6 +87,9 @@ async def chat_voice(
     session_id: str = Form(...),
     persona_id: str = Form(...),
     lang: str | None = Form(None),
+    requested_tts_provider: str = Form("qwen_clone_tts", alias="tts_provider"),
+    qwen_voice_id: str = Form(""),
+    qwen_target_model: str = Form(""),
     store: SessionStore = Depends(get_session_store),
 ) -> ChatVoiceResponse:
     audio_bytes = await audio.read()
@@ -89,8 +97,17 @@ async def chat_voice(
         raise HTTPException(status_code=400, detail="audio 不能为空")
 
     try:
-        transcript = transcribe_wav(audio_bytes, audio.filename or "voice.wav", lang=lang)
-    except SenseVoiceClientError as exc:
+        asr_result = transcribe_with_fallback(
+            audio_bytes=audio_bytes,
+            filename=audio.filename or "voice.wav",
+            lang=lang,
+        )
+        transcript = asr_result.text
+        logger.info("ASR provider selected: %s", asr_result.provider)
+    except ASRUnavailableError as exc:
+        logger.warning("ASR 全量不可用，建议切换文本输入: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ASRServiceError as exc:
         logger.warning("ASR 转写失败: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -107,10 +124,14 @@ async def chat_voice(
 
     tts_media_type = "audio/wav"
     tts_audio_base64 = ""
+    resolved_tts_provider: str | None = None
     tts_error: str | None = None
     try:
-        tts_media_type, tts_audio_base64 = synthesize_assistant_audio_base64(
-            str(text_result.get("assistant_raw_text", text_result["assistant_text"]))
+        tts_media_type, tts_audio_base64, resolved_tts_provider = synthesize_assistant_audio_base64(
+            str(text_result.get("assistant_raw_text", text_result["assistant_text"])),
+            force_tts_provider=requested_tts_provider,
+            qwen_voice_id=qwen_voice_id,
+            qwen_target_model=qwen_target_model,
         )
     except ChatServiceError as exc:
         tts_error = str(exc)
@@ -118,10 +139,12 @@ async def chat_voice(
 
     return ChatVoiceResponse(
         transcript_text=transcript,
+        asr_provider=asr_result.provider,
         assistant_text=text_result["assistant_text"],
         tts_media_type=tts_media_type,
         tts_audio_base64=tts_audio_base64,
         tts_error=tts_error,
+        tts_provider=resolved_tts_provider,
         emotion=text_result["emotion"],
         animation=text_result["animation"],
     )

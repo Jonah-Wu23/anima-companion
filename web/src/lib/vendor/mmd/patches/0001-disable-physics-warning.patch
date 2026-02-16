@@ -1,0 +1,13 @@
+# 0001-disable-physics-warning.patch
+
+```diff
+diff --git a/MMDAnimationHelper.js b/MMDAnimationHelper.js
+@@
+-		console.warn( 'THREE.MMDAnimationHelper: The module has been deprecated ...' );
++		// patched: silence deprecated warning in local vendor fork
+
+diff --git a/MMDPhysics.js b/MMDPhysics.js
+@@
+-		console.warn( 'THREE.MMDPhysics: The module has been deprecated ...' );
++		// patched: silence deprecated warning in local vendor fork
+```

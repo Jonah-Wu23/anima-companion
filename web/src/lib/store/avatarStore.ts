@@ -1,17 +1,17 @@
 import { create } from 'zustand';
-import type { ModelStatus, MotionState } from '../api/types';
+import type { Emotion, ModelStatus, MotionState } from '../api/types';
 
 export type SceneStatus = 'loading' | 'ready' | 'error';
 
 interface AvatarState {
   sceneStatus: SceneStatus;
-  emotion: string; // 'neutral', 'happy', 'sad', etc.
+  emotion: Emotion;
   modelStatus: ModelStatus;
   currentMotion: MotionState | string;
   modelProgress: number; // 0-100
 
   setSceneStatus: (status: SceneStatus) => void;
-  setEmotion: (emotion: string) => void;
+  setEmotion: (emotion: Emotion) => void;
   setModelStatus: (status: ModelStatus) => void;
   setCurrentMotion: (motion: MotionState | string) => void;
   setModelProgress: (progress: number) => void;

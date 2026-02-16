@@ -22,6 +22,7 @@
 P3 是**"沉浸升级"**阶段，核心目标是将"功能可用"升级为"情感沉浸"。
 
 - **VAD 免按键通话**：实现语音活性检测，用户无需按住按钮即可自然对话。
+- **语音后端兼容与降级**：兼容 CosyVoice 声音复刻 API 与 Fun-ASR 实时语音识别 Python SDK；当程序连接不到 GPT-SoVITS 或 SenseVoice 时，自动切换到 CosyVoice/Fun-ASR；若仍不可用再降级（不阻塞主流程）。
 - **触摸互动系统**：点击、拖拽、悬停等交互，角色给予视觉/动作反馈。
 - **情绪-动作-语音联动**：LLM 返回的情绪标签驱动表情 Morph 组合与动作强度。
 - **复杂表情系统**：从单一口型升级到多 Morph 组合（眉、眼、嘴协同）。
@@ -144,17 +145,21 @@ if (material.name === '髪' || material.name === '髪2') {
 
 | 模块 | 交付物 | 执行者 |
 |---|---|---|
-| 模型资产登记（Model Registry） | `docs/assets/models/*.md` + 命名规范 | 强逻辑AI |
-| MMDLoader Fork / three.js 升级 | `web/src/lib/vendor/mmd/*` + 回归 | 强逻辑AI |
-| VAD 核心录音与状态机 | `vad-recorder.ts` / `pipelineStore` | 强逻辑AI |
-| VAD Dock 交互与视觉 | `VoiceInputDock.tsx` 交互、动效、文案 | 强视觉AI |
-| 触摸互动的交互设计 | 点击/拖拽/悬停反馈规则与手势 | 强视觉AI |
-| 触摸互动的判定与驱动 | Raycast / 命中区域 / 触发动作与表情 | 强逻辑AI |
-| 表情“看起来对” | 表情组合、强度曲线、眨眼节奏 | 强视觉AI |
-| 表情“跑得稳” | Morph 映射、blend、与口型/动作联动 | 强逻辑AI |
-| 房间氛围与布景 | GLTF/灯光/材质/构图 | 强视觉AI |
-| 时间/相册数据层 | 事件记录、存储、删除、隐私开关 | 强逻辑AI |
-| 相册 UI/动效 | 版式、动效、可读性 | 强视觉AI |
+| 模型资产登记（Model Registry） | `docs/assets/models/*.md` + 命名规范（✅ 已完成，2026-02-15） | 强逻辑AI |
+| 语音后端兼容与降级 | ASR/TTS Provider 抽象 + 可用性探测 + fallback 策略（✅ 已完成，2026-02-15） | 强逻辑AI |
+| CosyVoice 声音复刻接入 | voice enrollment 流程 + voice_id 管理方案（✅ 已完成，2026-02-15） | 强逻辑AI |
+| Fun-ASR 实时识别接入 | 实时识别 SDK 封装 + 与 Web 音频流对接方案（✅ 已完成，2026-02-15） | 强逻辑AI |
+| 千问语音模型迁移（Qwen TTS） | 默认 provider 迁移 + 前端显式 `tts_provider=qwen_clone_tts` + 响应 provider 校验（✅ 已完成，2026-02-15） | 强逻辑AI |
+| MMDLoader Fork / three.js 升级 | `web/src/lib/vendor/mmd/*` + 回归（✅ 已完成，2026-02-15） | 强逻辑AI |
+| VAD 核心录音与状态机 | `vad-recorder.ts` / `pipelineStore`（✅ 已完成，2026-02-15） | 强逻辑AI |
+| VAD Dock 交互与视觉 | `VoiceInputDock.tsx` 交互、动效、文案（✅ 已完成，2026-02-15） | 强视觉AI |
+| 触摸互动的交互设计 | 点击/拖拽/悬停反馈规则与手势（✅ 已完成，2026-02-15） | 强视觉AI |
+| 触摸互动的判定与驱动 | Raycast / 命中区域 / 触发动作与表情（✅ 已完成，2026-02-15） | 强逻辑AI |
+| 表情"看起来对" | 表情组合、强度曲线、自动眨眼实现（随机2-6秒间隔、100ms闭眼/120ms睁眼）（✅ 已完成，2026-02-16） | 强视觉AI |
+| 表情“跑得稳” | Morph 映射、blend、与口型/动作联动（✅ 已完成，2026-02-16） | 强逻辑AI |
+| 房间氛围与布景 | GLTF/灯光/材质/构图 | 强视觉AI | ✅ 已完成（2026-02-16）
+| 时间/相册数据层 | 事件记录、存储、删除、隐私开关（✅ 已完成，2026-02-16） | 强逻辑AI |
+| 相册 UI/动效 | 版式、动效、可读性（✅ 已完成，2026-02-16） | 强视觉AI |
 | 换装 UI/选择器 | 选衣/预览/加载态 | 强视觉AI |
 | 换装加载/卸载/重绑定 | dispose、贴图缓存、动画重绑 | 强逻辑AI |
 
@@ -183,10 +188,10 @@ if (material.name === '髪' || material.name === '髪2') {
 - `mmd_download/models/` 下每个“可用 PMX”都必须有对应的 registry（双版本/faceward 等按多个模型入口处理）。
 
 **验收标准**：
-- [ ] `docs/assets/models/README.md` 索引更新
-- [ ] `mmd_download/models/` 清点完成：每个可用 PMX 均有 registry
-- [ ] 每个模型至少记录 1 个 PMX 的 SHA256（建议同时记录规约文件的 SHA256）
-- [ ] 明确 `assets/models/` 与 `mmd_download/` 均被 `.gitignore` 忽略，仅登记文档进入仓库
+- [x] `docs/assets/models/README.md` 索引更新
+- [x] `mmd_download/models/` 清点完成：每个可用 PMX 均有 registry
+- [x] 每个模型至少记录 1 个 PMX 的 SHA256（建议同时记录规约文件的 SHA256）
+- [x] 明确 `assets/models/` 与 `mmd_download/` 均被 `.gitignore` 忽略，仅登记文档进入仓库
 
 #### P0-2. 统一模型目录命名（建议规范）
 
@@ -253,22 +258,54 @@ web/src/lib/vendor/mmd/
 | `web/tsconfig.json` | 如需要，添加 vendor 目录到编译范围 |
 
 **验收标准**：
-- [ ] `npm run typecheck:web` 通过（或 `cd web` 后执行 `npm run typecheck`）
-- [ ] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
-- [ ] MMD 模型加载、动作播放、口型同步功能正常
-- [ ] three.js 可升级到最新版本（如 r173+）
+- [x] `npm run typecheck:web` 通过（或 `cd web` 后执行 `npm run typecheck`）
+- [x] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
+- [x] MMD 模型加载、动作播放、口型同步功能正常
+- [x] three.js 可升级到最新版本（如 r173+）
 
 ---
 
-### Phase B：交互层升级 — VAD 与触摸互动（预计 2-3 工作单元）
+### Phase B：交互层升级 — 语音兼容/VAD 与触摸互动（预计 3-4 工作单元）
 
 **主执行**：强逻辑AI（音频/状态机） + 强视觉AI（交互与视觉）
+
+#### B0. 语音后端兼容与降级（CosyVoice / Fun-ASR）
+
+**主执行**：强逻辑AI
+
+**目标**：
+- **兼容**：
+  - CosyVoice 声音复刻（Voice Enrollment）API：用 10~20 秒参考音频生成 `voice_id`
+  - CosyVoice 语音合成（TTS）：使用 `voice_id` 合成回复语音（要求合成 model 与 enrollment 的 `target_model` 一致）
+  - Fun-ASR 实时语音识别 Python SDK：双向流式实时识别（建议 100ms/包）
+- **自动切换（fallback）**：当服务不可达时不阻塞主流程
+  - **TTS**：优先 Qwen Clone TTS；连接不到 Qwen 时切换到 GPT-SoVITS；若 GPT-SoVITS 也不可用可继续切到 CosyVoice，最终降级为纯文本返回（仅填充 `tts_error`）
+  - **ASR**：优先 SenseVoice；连接不到 SenseVoice 时切换到 Fun-ASR；若 Fun-ASR 也不可用则关闭语音输入路径并提示用户改用文本输入继续对话
+
+**参考音频**：
+- 开发样本统一使用：`assets/audio/references/*`
+- CosyVoice 复刻接口要求公网可访问 URL：需要将参考音频上传到可公开访问位置（如 OSS），再调用 enrollment（计划内不强制自动上传）
+
+**建议实现口径**（计划约束，不涉及读取 `server/.env`）：
+- 通过环境变量配置 key 与开关（禁止硬编码 API Key）
+- 增加 provider 可用性探测（启动时与按需探测均可），并将“不可用”缓存一段时间避免每次请求都阻塞重试
+- 将 ASR/TTS 作为可插拔 provider，并明确优先级与回退链路：
+  - ASR：`sensevoice_http` -> `fun_asr_realtime` -> 禁用语音输入（引导切文本）
+  - TTS：`qwen_clone_tts` -> `gpt_sovits` -> `cosyvoice_tts` -> 禁用语音输出（纯文本）
+- CosyVoice `voice_id` 管理策略：
+  - 优先复用已存在 `voice_id`（避免每次创建占用配额）
+  - 若未配置 `voice_id`，可在后台执行一次 enrollment（需要音频 URL）；失败不影响对话主流程（直接走下一层 fallback）
+
+**2026-02-15 迁移补充（千问语音模型）**：
+- 后端默认 TTS 优先级已迁移为 `qwen_clone_tts,gpt_sovits`，并支持显式透传 `tts_provider/qwen_voice_id/qwen_target_model`。
+- 前端在 `chat/text-with-voice` 与 `chat/voice` 两条链路均显式传入 `tts_provider=qwen_clone_tts`（可选覆盖 `qwen_*`）。
+- 前端新增返回 `tts_provider` 校验，若未走 `qwen_clone_tts` 则直接报错，避免静默回退导致感知不一致。
 
 #### B1. VAD 免按键通话
 
 **目标**：实现语音活性检测，用户说话时自动开始录音，停止时自动发送。
 
-**技术选型**：`@ricky0123/vad` (WebRTC-based VAD，轻量且成熟)
+**技术选型**：`@ricky0123/vad-web` (WebRTC-based VAD，轻量且成熟)
 
 **新增文件**：
 
@@ -348,6 +385,8 @@ interface PipelineState {
 |------|------|------|---------|
 | MMDLoader Fork 后兼容性差 | 中 | 高 | 完整回归测试；保留原方案回滚 |
 | VAD 在中文场景效果差 | 中 | 高 | 可调参数 + 按键模式兜底 |
+| Fun-ASR/CosyVoice 接入依赖外部网络与 SDK 版本 | 中 | 中 | provider 可插拔；不可用自动切换，最终降级；明确提示与日志定位 |
+| CosyVoice enrollment 需要公网 URL（本地参考音频需先上传） | 中 | 中 | 优先复用 voice_id；将“上传与 enrollment”做成一次性流程；失败不阻塞主流程 |
 | ~~白厄 Morph 名称不规范~~ | ✅ 已解决 | - | P2已确认`あ`可用 |
 | 房间资产找不到合适风格 | 中 | 中 | 程序生成基础房间；后续迭代 |
 | 换装模型许可/归档不清导致不可用 | 中 | 高 | P0 模型登记；只将“许可明确可用”的模型纳入换装候选 |
@@ -362,8 +401,9 @@ interface PipelineState {
 
 ### 8.1 功能验收
 
-- [ ] **A1**: three.js 升级到 r173+，MMD 功能正常
-- [ ] **B1**: VAD 触发足够准确（实际使用不明显误触发/漏触发），支持 VAD/按键/文本三模切换
+- [x] **A1**: three.js 升级到 r173+，MMD 功能正常
+- [x] **B0**: GPT-SoVITS/SenseVoice 不可达时自动切换到 CosyVoice/Fun-ASR；若仍不可用再降级（不阻塞主流程），错误可定位且可引导用户继续使用（切换文本/关闭语音）
+- [x] **B1**: VAD 触发足够准确（实际使用不明显误触发/漏触发），支持 VAD/按键/文本三模切换
 - [ ] **B2**: 触摸交互响应及时，点击头部/身体有反馈
 - [ ] **C1**: 支持多种基础表情（眉/眼/嘴协同），眨眼动画自然
 - [ ] **C2**: LLM 返回情绪标签，驱动表情/动作/TTS 联动
@@ -382,9 +422,9 @@ interface PipelineState {
 
 ### 8.3 质量门禁
 
-- [ ] `npm run typecheck:web` 通过（0 error）（或 `cd web` 后执行 `npm run typecheck`）
-- [ ] `npm run lint:web` 通过（0 error / 0 warning）（或 `cd web` 后执行 `npm run lint`）
-- [ ] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
+- [x] `npm run typecheck:web` 通过（0 error）（或 `cd web` 后执行 `npm run typecheck`）
+- [x] `npm run lint:web` 通过（0 error / 0 warning）（或 `cd web` 后执行 `npm run lint`）
+- [x] `npm run build:web` 通过（或 `cd web` 后执行 `npm run build`）
  
 - [ ] P0/P1/P2 功能回归通过
 - [ ] 降级机制验证通过
@@ -404,7 +444,7 @@ interface PipelineState {
 
 ```json
 {
-  "@ricky0123/vad": "^0.0.20",
+  "@ricky0123/vad-web": "^0.0.27",
   "three": "^0.173.0"
 }
 ```
@@ -420,10 +460,13 @@ interface PipelineState {
 | 预研项 | 截止时间 | 负责人 | 状态 |
 |--------|---------|--------|------|
 | ~~白厄 PMX Morph 清单~~ | ~~Phase C 开始前~~ | ~~开发~~ | ✅ P2已完成（`あ`已确认） |
-| VAD 库技术验证 | Phase B1 开始前 | 开发 | ⬜ 待执行 |
+| VAD 库技术验证 | Phase B1 开始前 | 开发 | ✅ 已完成（2026-02-15） |
+| Fun-ASR 实时识别 SDK 可用性验证（最小可跑通） | Phase B0 开始前 | 开发 | ✅ 已完成（2026-02-15） |
+| CosyVoice 声音复刻最小链路（enroll -> voice_id） | Phase B0 开始前 | 开发 | ✅ 已完成（2026-02-15） |
+| CosyVoice 合成最小链路（voice_id -> TTS 音频） | Phase B0 开始前 | 开发 | ✅ 已完成（2026-02-15） |
 | 房间资产采购/制作 | Phase D1 开始前 | 美术/策划 | ⬜ 待执行 |
 | 换装模型清点/命名/迁移（从 mmd_download -> assets/models） | Phase E1 开始前 | 美术/策划/开发 | ⬜ 待执行 |
-| three.js r173 升级影响评估 | Phase A1 开始前 | 开发 | ⬜ 待执行 |
+| three.js r173 升级影响评估 | Phase A1 开始前 | 开发 | ✅ 已完成（2026-02-15） |
 
 ---
 
@@ -432,12 +475,12 @@ interface PipelineState {
 | 阶段 | 预估工作单元 | 说明 |
 |------|-------------|------|
 | Phase A (技术债) | 1-2 | MMDLoader Fork |
-| Phase B (交互层) | 2-3 | VAD + 触摸互动 |
+| Phase B (交互层) | 3-4 | 语音后端兼容/降级 + VAD + 触摸互动 |
 | Phase C (表现层) | 2-3 | 表情系统 + 情绪联动 |
 | Phase D (空间层) | 2-3 | 房间 + 时间 + 相册 |
 | Phase E (换装) | 1-2 | 依赖资产 |
 | Phase F (测试) | 1 | 功能 + 回归 |
-| **总计** | **10-14** | ~2.5-3.5 周（单人）|
+| **总计** | **11-15** | ~2.75-3.75 周（单人）|
 
 ---
 
@@ -545,7 +588,7 @@ async def vip_required(feature: str):
 
 **计划制定**: AI Assistant (开发编排经理)  
 **制定日期**: 2026-02-14  
-**版本**: P3-Plan-v1.2  
+**版本**: P3-Plan-v1.7  
 **状态**: Draft (待审核)
 
 ---
@@ -558,6 +601,14 @@ async def vip_required(feature: str):
 | v1.1 | 2026-02-14 | 根据P2收尾文档更新：<br>• 换装系统改为"总体模型切换"方案<br>• 添加A0 P2性能基准测试<br>• 更新P2已完成项与遗留项<br>• 添加P2技术积累（头发修复/相机优化/口型调试）<br>• 确认Morph名称已验证（`あ`）<br>• 更新风险矩阵与验收标准 | AI Assistant |
 | v1.2 | 2026-02-14 | 补充VIP相关内容：<br>• P2验收结论增加VIP模式门控与文字转语音链路<br>• P3不做什么明确P4工作范围（充值页、后端鉴权）<br>• 新增第12章P4展望，详细说明商业化与安全加固规划 | AI Assistant |
 | v1.3 | 2026-02-14 | 调整执行顺序与分工：<br>• 新增 Phase 0（Model Registry）并引入“强视觉AI/强逻辑AI”分工表<br>• 明确“双版本/多PMX”按多个模型登记与命名<br>• 取消 A0 性能基准测试与量化性能验收（改为非量化体验验收） | AI Assistant |
+| v1.4 | 2026-02-15 | B0 进展同步：<br>• 标记 CosyVoice 声音复刻接入为已完成（enroll -> voice_id 已验证）<br>• 标记 Fun-ASR 实时识别接入为已完成（SDK 封装与 Web 音频流接口已落地）<br>• 勾选 B0 验收项与对应预研项完成状态 | AI Assistant |
+| v1.5 | 2026-02-15 | 阶段状态同步：<br>• 标记“模型资产登记（Model Registry）”为已完成<br>• 标记“语音后端兼容与降级”为已完成<br>• 勾选 Phase 0 模型登记验收清单 | AI Assistant |
+| v1.6 | 2026-02-15 | 交付状态同步：<br>• 标记“MMDLoader Fork / three.js 升级”为已完成并勾选 A1 验收项<br>• 标记“VAD 核心录音与状态机”为已完成并勾选 B1 验收项<br>• 新增“千问语音模型迁移”说明（默认优先级、前端显式 provider、返回校验）<br>• 更新依赖项为 `@ricky0123/vad-web`，并勾选本轮 web 构建/类型/lint 门禁 | AI Assistant |
+| v1.7 | 2026-02-15 | 交付状态同步：<br>• 标记“VAD Dock 交互与视觉”为已完成<br>• 标记“触摸互动的交互设计”为已完成<br>• 标记“触摸互动的判定与驱动”为已完成 | AI Assistant |
+| v1.8 | 2026-02-16 | 表情系统完成：<br>• 实现自动眨眼功能（`expression-driver.ts`）<br>• 随机间隔 2-6 秒，100ms 闭眼 / 120ms 睁眼<br>• 标记"表情看起来对"分工项为已完成 | AI Assistant |
+| v1.9 | 2026-02-16 | 表情稳定性联动完成：<br>• 实现“基础情绪 + 触摸瞬时 + 自动眨眼”三层 Morph blend（`expression-driver.ts`）<br>• 增加与口型能量/动作阶段的耦合抑制，降低 speaking 期间嘴部 Morph 互抢<br>• 打通 `emotion/animation` 到角色状态（`VoiceInputDock`/`MessagePanel` -> `avatarStore`/`pipelineStore`）<br>• 移除触摸层对 `lipSyncEnergy` 的直接写入，避免与语音口型冲突<br>• 标记“表情跑得稳”分工项为已完成 | AI Assistant |
+| v1.10 | 2026-02-16 | 房间氛围与布景完成：<br>• 窗外：添加 Sky 组件实现蓝天白云，午后斜阳角度<br>• 灯光：暖金主光源（窗户方向）+ 冷调补光 + 暖环境光 + 点光源 + 天空蓝半球光<br>• 效果：温暖辉光（Bloom, intensity=0.4）+ 边缘暗角（Vignette），去除景深避免模糊<br>• 天花板：配合 GLB 场景的天花板遮挡顶部，窗外可见蓝天<br>• 标记"房间氛围与布景"分工项为已完成 | AI Assistant |
+| v1.11 | 2026-02-16 | 相册模块完成：<br>• 标记“时间/相册数据层”为已完成（事件记录、存储、删除、隐私开关）<br>• 标记“相册 UI/动效”为已完成（画廊页、动效与可读性优化）<br>• 补充主页面截图入相册与相册入口联动说明 | AI Assistant |
 
 ```
                               ╔═══════════════════╗

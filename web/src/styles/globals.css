@@ -150,6 +150,88 @@ body {
     inset 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
+/* Touch Feedback Animations */
+@keyframes ripple {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.5;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 0.6s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(56, 189, 248, 0.5);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Touch Interaction Highlight */
+.touch-highlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.touch-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--touch-x, 50%) var(--touch-y, 50%), 
+    rgba(56, 189, 248, 0.3) 0%, 
+    transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.touch-highlight:active::after {
+  opacity: 1;
+}
+
+/* Hit Zone Hover Effect */
+.hit-zone-hover {
+  transition: all 0.3s ease;
+}
+
+.hit-zone-hover:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+}
+
+/* Gesture Feedback */
+.gesture-feedback {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ripple,
+  .animate-pulse-glow {
+    animation: none;
+  }
+  
+  .touch-highlight::after {
+    transition: none;
+  }
+}
+
 /* Reduced Motion: Global Animation Degradation */
 @media (prefers-reduced-motion: reduce) {
   *,

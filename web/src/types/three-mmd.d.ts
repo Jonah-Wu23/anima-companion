@@ -1,4 +1,4 @@
-declare module 'three/examples/jsm/loaders/MMDLoader.js' {
+declare module '@/lib/vendor/mmd/MMDLoader.js' {
   import * as THREE from 'three';
 
   export class MMDLoader extends THREE.Loader {
@@ -19,7 +19,7 @@ declare module 'three/examples/jsm/loaders/MMDLoader.js' {
   }
 }
 
-declare module 'three/examples/jsm/animation/MMDAnimationHelper.js' {
+declare module '@/lib/vendor/mmd/MMDAnimationHelper.js' {
   import * as THREE from 'three';
 
   interface HelperOptions {

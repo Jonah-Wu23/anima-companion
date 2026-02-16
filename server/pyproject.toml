@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Backend services for anima companion android"
 requires-python = ">=3.11"
 dependencies = [
+  "dashscope>=1.23.1",
   "fastapi>=0.115.0",
   "httpx>=0.28.0",
+  "python-dotenv>=1.0.1",
   "python-multipart>=0.0.20",
   "uvicorn>=0.30.0",
 ]

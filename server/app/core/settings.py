@@ -22,6 +22,18 @@ def _to_float(value: str, fallback: float) -> float:
         return fallback
 
 
+def _to_optional_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
 def _to_bool(value: str, fallback: bool) -> bool:
     if value is None:
         return fallback
@@ -69,6 +81,25 @@ class Settings:
     asr_base_url: str
     asr_timeout_seconds: float
     default_asr_lang: str
+    asr_provider_priority: tuple[str, ...]
+    tts_provider_priority: tuple[str, ...]
+    provider_failure_cooldown_seconds: float
+    provider_probe_interval_seconds: float
+    provider_probe_timeout_seconds: float
+    dashscope_api_key: str
+    dashscope_base_websocket_api_url: str
+    qwen_voice_customization_url: str
+    qwen_tts_realtime_ws_url: str
+    fun_asr_model: str
+    fun_asr_sample_rate: int
+    fun_asr_format: str
+    fun_asr_semantic_punctuation_enabled: bool
+    fun_asr_max_sentence_silence: int
+    fun_asr_multi_threshold_mode_enabled: bool
+    fun_asr_heartbeat: bool
+    fun_asr_language_hints: tuple[str, ...]
+    fun_asr_vocabulary_id: str
+    fun_asr_speech_noise_threshold: float | None
     dialogue_history_limit: int
     event_inject_every_turns: int
     allow_local_chat_cache: bool
@@ -90,6 +121,16 @@ class Settings:
     gpt_sovits_parallel_infer: bool
     gpt_sovits_split_bucket: bool
     gpt_sovits_seed: int
+    cosyvoice_target_model: str
+    cosyvoice_voice_id: str
+    cosyvoice_voice_prefix: str
+    cosyvoice_voice_alias: str
+    cosyvoice_enroll_audio_url: str
+    cosyvoice_auto_enroll: bool
+    cosyvoice_poll_interval_seconds: float
+    cosyvoice_poll_max_attempts: int
+    cosyvoice_language_hints: tuple[str, ...]
+    cosyvoice_registry_path: Path
     cors_allow_origins: tuple[str, ...]
 
 
@@ -117,6 +158,66 @@ def get_settings() -> Settings:
         asr_base_url=os.getenv("SENSEVOICE_BASE_URL", "http://127.0.0.1:50000"),
         asr_timeout_seconds=_to_float(os.getenv("SENSEVOICE_TIMEOUT_SECONDS", "30"), 30.0),
         default_asr_lang=os.getenv("SENSEVOICE_DEFAULT_LANG", "zh"),
+        asr_provider_priority=tuple(
+            _to_csv_list(
+                os.getenv("ASR_PROVIDER_PRIORITY"),
+                ["sensevoice_http", "fun_asr_realtime"],
+            )
+        ),
+        tts_provider_priority=tuple(
+            _to_csv_list(
+                os.getenv("TTS_PROVIDER_PRIORITY"),
+                ["qwen_clone_tts", "gpt_sovits"],
+            )
+        ),
+        provider_failure_cooldown_seconds=_to_float(
+            os.getenv("PROVIDER_FAILURE_COOLDOWN_SECONDS", "30"),
+            30.0,
+        ),
+        provider_probe_interval_seconds=_to_float(
+            os.getenv("PROVIDER_PROBE_INTERVAL_SECONDS", "10"),
+            10.0,
+        ),
+        provider_probe_timeout_seconds=_to_float(
+            os.getenv("PROVIDER_PROBE_TIMEOUT_SECONDS", "2"),
+            2.0,
+        ),
+        dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", ""),
+        dashscope_base_websocket_api_url=os.getenv(
+            "DASHSCOPE_BASE_WEBSOCKET_API_URL",
+            "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+        ),
+        qwen_voice_customization_url=os.getenv(
+            "QWEN_VOICE_CUSTOMIZATION_URL",
+            "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization",
+        ),
+        qwen_tts_realtime_ws_url=os.getenv(
+            "QWEN_TTS_REALTIME_WS_URL",
+            "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+        ),
+        fun_asr_model=os.getenv("FUN_ASR_MODEL", "fun-asr-realtime"),
+        fun_asr_sample_rate=_to_int(os.getenv("FUN_ASR_SAMPLE_RATE", "16000"), 16000),
+        fun_asr_format=os.getenv("FUN_ASR_FORMAT", "pcm"),
+        fun_asr_semantic_punctuation_enabled=_to_bool(
+            os.getenv("FUN_ASR_SEMANTIC_PUNCTUATION_ENABLED", "false"),
+            False,
+        ),
+        fun_asr_max_sentence_silence=_to_int(
+            os.getenv("FUN_ASR_MAX_SENTENCE_SILENCE", "1300"),
+            1300,
+        ),
+        fun_asr_multi_threshold_mode_enabled=_to_bool(
+            os.getenv("FUN_ASR_MULTI_THRESHOLD_MODE_ENABLED", "false"),
+            False,
+        ),
+        fun_asr_heartbeat=_to_bool(os.getenv("FUN_ASR_HEARTBEAT", "false"), False),
+        fun_asr_language_hints=tuple(
+            _to_csv_list(os.getenv("FUN_ASR_LANGUAGE_HINTS"), ["zh", "en"])
+        ),
+        fun_asr_vocabulary_id=os.getenv("FUN_ASR_VOCABULARY_ID", ""),
+        fun_asr_speech_noise_threshold=_to_optional_float(
+            os.getenv("FUN_ASR_SPEECH_NOISE_THRESHOLD")
+        ),
         dialogue_history_limit=_to_int(os.getenv("DIALOGUE_HISTORY_LIMIT", "12"), 12),
         event_inject_every_turns=_to_int(os.getenv("EVENT_INJECT_EVERY_TURNS", "5"), 5),
         allow_local_chat_cache=_to_bool(os.getenv("ALLOW_LOCAL_CHAT_CACHE", "true"), True),
@@ -149,6 +250,56 @@ def get_settings() -> Settings:
         gpt_sovits_parallel_infer=_to_bool(os.getenv("GPT_SOVITS_PARALLEL_INFER", "true"), True),
         gpt_sovits_split_bucket=_to_bool(os.getenv("GPT_SOVITS_SPLIT_BUCKET", "true"), True),
         gpt_sovits_seed=_to_int(os.getenv("GPT_SOVITS_SEED", "-1"), -1),
+        cosyvoice_target_model=os.getenv(
+            "QWEN_TTS_TARGET_MODEL",
+            os.getenv("COSYVOICE_TARGET_MODEL", "qwen3-tts-vc-realtime-2026-01-15"),
+        ),
+        cosyvoice_voice_id=os.getenv("QWEN_VOICE_ID", os.getenv("COSYVOICE_VOICE_ID", "")),
+        cosyvoice_voice_prefix=os.getenv(
+            "QWEN_VOICE_PREFIX",
+            os.getenv("COSYVOICE_VOICE_PREFIX", "phainon"),
+        ),
+        cosyvoice_voice_alias=os.getenv(
+            "QWEN_VOICE_ALIAS",
+            os.getenv("COSYVOICE_VOICE_ALIAS", "default"),
+        ),
+        cosyvoice_enroll_audio_url=os.getenv(
+            "QWEN_ENROLL_AUDIO_URL",
+            os.getenv("COSYVOICE_ENROLL_AUDIO_URL", ""),
+        ),
+        cosyvoice_auto_enroll=_to_bool(
+            os.getenv("QWEN_AUTO_ENROLL", os.getenv("COSYVOICE_AUTO_ENROLL", "false")),
+            False,
+        ),
+        cosyvoice_poll_interval_seconds=_to_float(
+            os.getenv(
+                "QWEN_POLL_INTERVAL_SECONDS",
+                os.getenv("COSYVOICE_POLL_INTERVAL_SECONDS", "5"),
+            ),
+            5.0,
+        ),
+        cosyvoice_poll_max_attempts=_to_int(
+            os.getenv(
+                "QWEN_POLL_MAX_ATTEMPTS",
+                os.getenv("COSYVOICE_POLL_MAX_ATTEMPTS", "24"),
+            ),
+            24,
+        ),
+        cosyvoice_language_hints=tuple(
+            _to_csv_list(
+                os.getenv("QWEN_LANGUAGE_HINTS", os.getenv("COSYVOICE_LANGUAGE_HINTS")),
+                ["zh"],
+            )
+        ),
+        cosyvoice_registry_path=Path(
+            os.getenv(
+                "QWEN_REGISTRY_PATH",
+                os.getenv(
+                    "COSYVOICE_REGISTRY_PATH",
+                    str(server_root / ".data" / "qwen_voice_registry.json"),
+                ),
+            )
+        ),
         cors_allow_origins=tuple(
             _to_csv_list(
                 os.getenv("CORS_ALLOW_ORIGINS"),

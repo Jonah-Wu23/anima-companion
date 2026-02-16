@@ -14,6 +14,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.bmp': 'image/bmp',
   '.tga': 'image/x-targa',
   '.txt': 'text/plain; charset=utf-8',

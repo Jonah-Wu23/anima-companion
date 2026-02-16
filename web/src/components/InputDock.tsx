@@ -2,20 +2,30 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Mic, Settings, XCircle } from 'lucide-react';
 import { useSessionStore } from '@/lib/store/sessionStore';
-import { usePipelineStore } from '@/lib/store/pipelineStore';
+import { usePipelineStore, type InputMode, type VADStatus } from '@/lib/store/pipelineStore';
 import { useSettingsStore } from '@/lib/store/settingsStore';
+import { useAvatarStore } from '@/lib/store/avatarStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import VipModal from '@/components/VipModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
-import type { ChatTextVoiceResponse } from '@/lib/api/types';
+import type { Animation, ChatTextVoiceResponse, Emotion } from '@/lib/api/types';
+import { VADRecorder } from '@/lib/audio/vad-recorder';
 
 type WebkitWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
   __testLipSync?: (energy?: number) => number;
 };
 const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
+const REQUIRED_TTS_PROVIDER = 'qwen_clone_tts';
+const DEFAULT_QWEN_VOICE_ID = (process.env.NEXT_PUBLIC_QWEN_VOICE_ID || '').trim();
+const DEFAULT_QWEN_TARGET_MODEL = (process.env.NEXT_PUBLIC_QWEN_TARGET_MODEL || '').trim();
+const VOICE_MODE_LABELS: Record<InputMode, string> = {
+  text: '文本',
+  'push-to-talk': '按键',
+  vad: 'VAD',
+};
 
 function mergeToMono(audioBuffer: AudioBuffer): Float32Array {
   const { numberOfChannels, length } = audioBuffer;
@@ -134,8 +144,25 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
   const enableVipMode = useSettingsStore((state) => state.enableVipMode);
+  const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
   
-  const { stage, error: pipelineError, setStage, setError, setLipSyncEnergy } = usePipelineStore();
+  const {
+    stage,
+    error: pipelineError,
+    inputMode,
+    vadStatus,
+    setStage,
+    setError,
+    setLipSyncEnergy,
+    setInputMode,
+    setVADStatus,
+    setAvatarAnimation,
+  } = usePipelineStore();
+
+  const applyAssistantState = useCallback((emotion: Emotion, animation: Animation) => {
+    setAvatarEmotion(emotion);
+    setAvatarAnimation(animation);
+  }, [setAvatarAnimation, setAvatarEmotion]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -148,6 +175,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   const lipSyncAnalyserRef = useRef<AnalyserNode | null>(null);
   const lipSyncSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const vadRecorderRef = useRef<VADRecorder | null>(null);
 
   const stopLipSyncTracking = useCallback(() => {
     if (lipSyncRafRef.current !== null) {
@@ -281,7 +309,10 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   useEffect(() => () => {
     stopPlaybackAndLipSync();
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-  }, [stopPlaybackAndLipSync]);
+    vadRecorderRef.current?.dispose();
+    vadRecorderRef.current = null;
+    setVADStatus('idle');
+  }, [setVADStatus, stopPlaybackAndLipSync]);
 
   const touchStartY = useRef<number | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
@@ -294,10 +325,233 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     return false;
   }, [vipModeEnabled]);
 
+  const ensureQwenProvider = useCallback((provider: string | null | undefined): boolean => {
+    const normalized = String(provider || '').trim().toLowerCase();
+    if (normalized === REQUIRED_TTS_PROVIDER) {
+      return true;
+    }
+    setError(`TTS 链路未走 Qwen（provider=${provider || 'unknown'}）`);
+    setStage('error');
+    return false;
+  }, [setError, setStage]);
+
   const handleActivateVip = useCallback(() => {
     enableVipMode();
     setIsVipModalOpen(false);
   }, [enableVipMode]);
+
+  const forceStopPressToTalk = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    recordStartAtRef.current = 0;
+    isStoppingRef.current = false;
+    setIsRecordingLocal(false);
+    setRecordingDuration(0);
+    setIsCanceling(false);
+    if (stage === 'recording') {
+      setStage('idle');
+    }
+  }, [setStage, stage]);
+
+  const submitVoiceBlob = useCallback(
+    async (wavBlob: Blob) => {
+      if (wavBlob.size === 0) {
+        throw new Error('录音为空，请重试');
+      }
+
+      setStage('uploading');
+
+      const response = await api.chatVoice(sessionId, DEFAULT_PERSONA_ID, wavBlob, {
+        tts_provider: REQUIRED_TTS_PROVIDER,
+        qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
+        qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
+      });
+
+      setStage('processing');
+
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: response.transcript_text || '（语音消息）',
+        createdAt: Date.now(),
+      });
+
+      addMessage({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response.assistant_text,
+        createdAt: Date.now(),
+        emotion: response.emotion,
+      });
+      applyAssistantState(response.emotion, response.animation);
+
+      if (response.tts_audio_base64) {
+        if (!ensureQwenProvider(response.tts_provider)) {
+          return;
+        }
+        await playAssistantAudioBase64(response.tts_audio_base64);
+        return;
+      }
+
+      if (response.tts_error) {
+        setError(
+          `语音合成未成功：${response.tts_error}` +
+            (response.tts_provider ? ` (provider=${response.tts_provider})` : '')
+        );
+        setStage('error');
+        return;
+      }
+
+      setStage('idle');
+    },
+    [
+      addMessage,
+      applyAssistantState,
+      ensureQwenProvider,
+      playAssistantAudioBase64,
+      sessionId,
+      setError,
+      setStage,
+    ]
+  );
+
+  const stopVADRecorder = useCallback(() => {
+    if (vadRecorderRef.current?.isRunning()) {
+      vadRecorderRef.current.stop();
+    }
+    setVADStatus('idle');
+  }, [setVADStatus]);
+
+  const startVADRecorder = useCallback(async () => {
+    if (vadRecorderRef.current?.isRunning()) {
+      return;
+    }
+
+    if (!requireVipOrPrompt()) {
+      setInputMode('text');
+      setVADStatus('idle');
+      return;
+    }
+
+    if (!vadRecorderRef.current) {
+      vadRecorderRef.current = new VADRecorder({
+        onSpeechStart: () => {
+          usePipelineStore.getState().setVADStatus('speaking');
+          usePipelineStore.getState().setStage('recording');
+        },
+        onSpeechEnd: async (audioBlob) => {
+          await submitVoiceBlob(audioBlob);
+        },
+        onVADMisfire: () => {
+          const store = usePipelineStore.getState();
+          store.setVADStatus('listening');
+          if (store.stage === 'recording') {
+            store.setStage('idle');
+          }
+        },
+        onStatusChange: (status) => {
+          const store = usePipelineStore.getState();
+          store.setVADStatus(status as VADStatus);
+          if (status === 'listening' && store.stage === 'recording') {
+            store.setStage('idle');
+          }
+        },
+        onError: (error) => {
+          usePipelineStore.getState().setError(error.message || 'VAD 录音失败');
+          usePipelineStore.getState().setStage('error');
+        },
+      });
+    }
+
+    await vadRecorderRef.current.start();
+  }, [requireVipOrPrompt, setInputMode, setVADStatus, submitVoiceBlob]);
+
+  const handleInputModeChange = useCallback(
+    async (nextMode: InputMode) => {
+      if (nextMode === inputMode) {
+        return;
+      }
+
+      if (nextMode !== 'text' && !requireVipOrPrompt()) {
+        return;
+      }
+
+      if (isRecordingLocal) {
+        forceStopPressToTalk();
+      }
+
+      if (nextMode !== 'vad') {
+        stopVADRecorder();
+      }
+
+      setInputMode(nextMode);
+      setError(null);
+      if (stage === 'error') {
+        setStage('idle');
+      }
+
+      if (nextMode === 'vad') {
+        try {
+          await startVADRecorder();
+        } catch (error) {
+          setError(extractApiErrorMessage(error, 'VAD 启动失败，请稍后重试'));
+          setStage('error');
+          setInputMode('push-to-talk');
+        }
+      }
+    },
+    [
+      forceStopPressToTalk,
+      inputMode,
+      isRecordingLocal,
+      requireVipOrPrompt,
+      setError,
+      setInputMode,
+      setStage,
+      startVADRecorder,
+      stage,
+      stopVADRecorder,
+    ]
+  );
+
+  useEffect(() => {
+    if (inputMode !== 'vad') {
+      stopVADRecorder();
+      return;
+    }
+
+    if (!vipModeEnabled || isRecordingLocal) {
+      stopVADRecorder();
+      return;
+    }
+
+    if (stage === 'processing' || stage === 'uploading' || stage === 'speaking' || stage === 'error') {
+      stopVADRecorder();
+      return;
+    }
+
+    void startVADRecorder().catch((error) => {
+      setError(extractApiErrorMessage(error, 'VAD 启动失败，请改用按键模式'));
+      setStage('error');
+      setInputMode('push-to-talk');
+    });
+  }, [
+    inputMode,
+    isRecordingLocal,
+    setError,
+    setInputMode,
+    setStage,
+    stage,
+    startVADRecorder,
+    stopVADRecorder,
+    vipModeEnabled,
+  ]);
 
   useEffect(() => {
     const globalWindow = window as WebkitWindow;
@@ -336,7 +590,10 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         ? await api.chatTextWithVoice({
             session_id: sessionId,
             persona_id: DEFAULT_PERSONA_ID,
-            user_text: textToSend
+            user_text: textToSend,
+            tts_provider: REQUIRED_TTS_PROVIDER,
+            qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
+            qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
           })
         : await api.chatText({
             session_id: sessionId,
@@ -351,6 +608,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         createdAt: Date.now(),
         emotion: response.emotion
       });
+      applyAssistantState(response.emotion, response.animation);
 
       if (autoPlayVoice && !vipModeEnabled) {
         setIsVipModalOpen(true);
@@ -359,11 +617,17 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       if (canUseVipVoice) {
         const voiceResponse = response as ChatTextVoiceResponse;
         if (voiceResponse.tts_audio_base64) {
+          if (!ensureQwenProvider(voiceResponse.tts_provider)) {
+            return;
+          }
           await playAssistantAudioBase64(voiceResponse.tts_audio_base64);
           return;
         }
         if (voiceResponse.tts_error) {
-          setError(`语音合成未成功：${voiceResponse.tts_error}`);
+          setError(
+            `语音合成未成功：${voiceResponse.tts_error}` +
+              (voiceResponse.tts_provider ? ` (provider=${voiceResponse.tts_provider})` : '')
+          );
           setStage('error');
           return;
         }
@@ -375,7 +639,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64]);
+  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64, ensureQwenProvider]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -386,8 +650,10 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
 
   // Recording Logic (Press to Talk)
   const startRecording = useCallback(async () => {
+    if (inputMode !== 'push-to-talk') return;
     if (isRecordingLocal) return;
     if (!requireVipOrPrompt()) return;
+    stopVADRecorder();
     stopPlaybackAndLipSync();
     setIsCanceling(false);
 
@@ -429,7 +695,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       alert("请允许麦克风权限以使用语音功能");
       setStage('idle');
     }
-  }, [isRecordingLocal, requireVipOrPrompt, setStage, stopPlaybackAndLipSync]);
+  }, [inputMode, isRecordingLocal, requireVipOrPrompt, setStage, stopPlaybackAndLipSync, stopVADRecorder]);
 
   const stopRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
@@ -467,40 +733,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
         }
 
         setIsRecordingLocal(false);
-        setStage('uploading');
-
-        const response = await api.chatVoice(sessionId, DEFAULT_PERSONA_ID, wavBlob);
-        
-        setStage('processing');
-        
-        // Add User Transcript
-        addMessage({
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: response.transcript_text || "（语音消息）",
-          createdAt: Date.now(),
-        });
-        
-        // Add Assistant Response
-        addMessage({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: response.assistant_text,
-          createdAt: Date.now(),
-          emotion: response.emotion
-        });
-        
-        // Handle TTS
-        if (response.tts_audio_base64) {
-          await playAssistantAudioBase64(response.tts_audio_base64);
-        } else {
-          if (response.tts_error) {
-            setError(`语音合成未成功：${response.tts_error}`);
-            setStage('error');
-            return;
-          }
-          setStage('idle');
-        }
+        await submitVoiceBlob(wavBlob);
         
       } catch (err) {
         console.error("Voice Chat Error:", err);
@@ -521,30 +754,17 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
 
     recorder.requestData();
     recorder.stop();
-  }, [isRecordingLocal, sessionId, setStage, setError, addMessage, stopPlaybackAndLipSync, isCanceling, playAssistantAudioBase64]);
+  }, [isCanceling, isRecordingLocal, setError, setStage, stopPlaybackAndLipSync, submitVoiceBlob]);
 
   const cancelRecording = useCallback(() => {
     if (!isRecordingLocal || !mediaRecorderRef.current) return;
-     if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
     const recorder = mediaRecorderRef.current;
-    isStoppingRef.current = true;
-    recorder.stop(); // This triggers onstop, where we handle cleanup based on isCanceling flag or we can just cleanup here
-    
-    // We can rely on onstop to handle cleanup if we set isCanceling to true before calling stop (which we do in handleTouchMove/End)
-    // But let's be explicit here just in case
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    mediaStreamRef.current = null;
-    mediaRecorderRef.current = null;
-    audioChunksRef.current = [];
-    recordStartAtRef.current = 0;
-    isStoppingRef.current = false;
-    setIsRecordingLocal(false);
-    setStage('idle');
-    setIsCanceling(false);
-  }, [isRecordingLocal, setStage]);
+    if (recorder.state === 'recording') {
+      isStoppingRef.current = true;
+      recorder.stop();
+    }
+    forceStopPressToTalk();
+  }, [forceStopPressToTalk, isRecordingLocal]);
 
   // Touch handlers for swipe-to-cancel
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -578,6 +798,21 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     setIsCanceling(false);
   };
 
+  const isPipelineBusy = stage === 'processing' || stage === 'uploading';
+  const isVADMode = inputMode === 'vad';
+  const isPushToTalkMode = inputMode === 'push-to-talk';
+  const isVADActive = isVADMode && vadStatus !== 'idle';
+  const inputPlaceholder = isPushToTalkMode
+    ? (isRecordingLocal ? '正在聆听...' : '输入消息或按住说话...')
+    : isVADMode
+      ? (vadStatus === 'speaking' ? '正在聆听你的声音...' : '直接说话，我会自动识别...')
+      : '输入消息...';
+  const modeHint = isVADMode
+    ? (vadStatus === 'speaking' ? 'VAD 正在收音' : vadStatus === 'processing' ? 'VAD 正在处理' : 'VAD 待机中')
+    : isPushToTalkMode
+      ? '按住麦克风开始录音'
+      : '文本模式';
+
   return (
     <>
       <div className={cn(
@@ -603,6 +838,29 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
           </div>
         )}
 
+        <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1 rounded-full bg-white/60 p-1 border border-white/40">
+            {(['text', 'push-to-talk', 'vad'] as InputMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                  inputMode === mode
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-white/80'
+                )}
+                onClick={() => {
+                  void handleInputModeChange(mode);
+                }}
+              >
+                {VOICE_MODE_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] text-slate-500">{modeHint}</div>
+        </div>
+
         {/* Main Dock Content */}
         <div className="flex items-center gap-3 p-4">
         {/* Settings Button */}
@@ -621,7 +879,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isRecordingLocal ? "正在聆听..." : "输入消息或按住说话..."}
+            placeholder={inputPlaceholder}
             className={cn(
               "h-12 px-6 py-3 rounded-full text-sm transition-all duration-300",
               "bg-white/50 border-transparent hover:bg-white/80",
@@ -629,7 +887,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
               "placeholder:text-neutral-400",
               isRecordingLocal && "opacity-50 pointer-events-none"
             )}
-            disabled={isRecordingLocal || stage === 'processing' || stage === 'uploading'}
+            disabled={isRecordingLocal || isPipelineBusy}
           />
         </div>
 
@@ -647,50 +905,75 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
                 "active:scale-95 transition-all duration-300",
                 "animate-fade-in"
               )}
-              disabled={stage === 'processing' || stage === 'uploading'}
+              disabled={isPipelineBusy}
             >
               <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
             </Button>
-          ) : (
-            /* Record Button */
+          ) : isPushToTalkMode ? (
+            /* Press-to-talk Button */
             <Button
               variant="ghost"
               className={cn(
                 "absolute inset-0 w-12 h-12 rounded-full p-0 transition-all duration-300",
-                isRecordingLocal 
-                  ? "bg-red-50 text-red-500 ring-4 ring-red-100 scale-110 z-10" 
+                isRecordingLocal
+                  ? "bg-red-50 text-red-500 ring-4 ring-red-100 scale-110 z-10"
                   : "bg-transparent text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/50"
               )}
-              // Mouse Events
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
-              onMouseLeave={cancelRecording} // Dragging out cancels
-              // Touch Events
+              onMouseLeave={cancelRecording}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              disabled={isPipelineBusy}
             >
               {isRecordingLocal ? (
                 <div className="relative w-full h-full flex items-center justify-center">
-                   <div className={cn(
-                     "absolute inset-0 rounded-full border-2 border-red-500 animate-ping opacity-20",
-                     isCanceling && "border-red-600 opacity-40 scale-125 duration-75"
-                   )}></div>
-                   <Mic className={cn(
-                     "w-6 h-6 animate-pulse",
-                     isCanceling && "text-red-600 scale-110"
-                   )} />
+                  <div className={cn(
+                    "absolute inset-0 rounded-full border-2 border-red-500 animate-ping opacity-20",
+                    isCanceling && "border-red-600 opacity-40 scale-125 duration-75"
+                  )}></div>
+                  <Mic className={cn(
+                    "w-6 h-6 animate-pulse",
+                    isCanceling && "text-red-600 scale-110"
+                  )} />
                 </div>
               ) : (
                 <Mic className="w-6 h-6" />
               )}
+            </Button>
+          ) : (
+            /* VAD/Text status button */
+            <Button
+              variant="ghost"
+              className={cn(
+                "absolute inset-0 w-12 h-12 rounded-full p-0 transition-all duration-300",
+                isVADActive
+                  ? "bg-sky-50 text-sky-600 ring-4 ring-sky-100"
+                  : "bg-transparent text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/50"
+              )}
+              onClick={() => {
+                if (isVADMode) {
+                  if (isVADActive) {
+                    stopVADRecorder();
+                    setInputMode('push-to-talk');
+                    return;
+                  }
+                  void handleInputModeChange('vad');
+                  return;
+                }
+                void handleInputModeChange('push-to-talk');
+              }}
+              disabled={isPipelineBusy}
+            >
+              <Mic className={cn("w-6 h-6", isVADMode && isVADActive && "animate-pulse")} />
             </Button>
           )}
         </div>
         </div>
       
         {/* Recording Overlay/Hints */}
-        {isRecordingLocal && (
+        {isPushToTalkMode && isRecordingLocal && (
           <div className="absolute bottom-full left-0 right-0 pb-4 flex flex-col items-center justify-end pointer-events-none animate-slide-up">
              {/* Timer Bubble */}
              <div className={cn(

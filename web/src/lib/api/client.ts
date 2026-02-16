@@ -8,6 +8,12 @@ import {
   UserClearResponse
 } from './types';
 
+interface VoiceTtsOptions {
+  tts_provider?: "auto" | "qwen_clone_tts" | "gpt_sovits" | "cosyvoice_tts";
+  qwen_voice_id?: string;
+  qwen_target_model?: string;
+}
+
 // Create axios instance with default config
 const apiClient = axios.create({
   // Default to 18000 to avoid stale legacy service on 8000.
@@ -37,12 +43,22 @@ export const api = {
   chatVoice: async (
     sessionId: string, 
     personaId: string, 
-    audioBlob: Blob
+    audioBlob: Blob,
+    ttsOptions?: VoiceTtsOptions
   ): Promise<ChatVoiceResponse> => {
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('persona_id', personaId);
     formData.append('audio', audioBlob, 'voice.wav');
+    if (ttsOptions?.tts_provider) {
+      formData.append('tts_provider', ttsOptions.tts_provider);
+    }
+    if (ttsOptions?.qwen_voice_id) {
+      formData.append('qwen_voice_id', ttsOptions.qwen_voice_id);
+    }
+    if (ttsOptions?.qwen_target_model) {
+      formData.append('qwen_target_model', ttsOptions.qwen_target_model);
+    }
     
     // Voice requests might take longer (upload + asr + llm + tts)
     const { data } = await apiClient.post<ChatVoiceResponse>('/v1/chat/voice', formData, {

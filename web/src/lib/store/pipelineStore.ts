@@ -2,17 +2,23 @@ import { create } from 'zustand';
 import { Animation } from '../api/types';
 
 export type PipelineStage = 'idle' | 'recording' | 'uploading' | 'processing' | 'speaking' | 'error';
+export type InputMode = 'vad' | 'push-to-talk' | 'text';
+export type VADStatus = 'idle' | 'listening' | 'speaking' | 'processing';
 
 interface PipelineState {
   stage: PipelineStage;
   error: string | null;
   avatarAnimation: Animation;
   lipSyncEnergy: number; // 0-1
+  inputMode: InputMode;
+  vadStatus: VADStatus;
   
   setStage: (stage: PipelineStage) => void;
   setError: (error: string | null) => void;
   setAvatarAnimation: (anim: Animation) => void;
   setLipSyncEnergy: (energy: number) => void;
+  setInputMode: (mode: InputMode) => void;
+  setVADStatus: (status: VADStatus) => void;
   reset: () => void;
 }
 
@@ -21,6 +27,8 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   error: null,
   avatarAnimation: 'idle',
   lipSyncEnergy: 0,
+  inputMode: 'push-to-talk',
+  vadStatus: 'idle',
 
   setStage: (stage) =>
     set((state) => {
@@ -33,5 +41,15 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   setError: (error) => set({ error }),
   setAvatarAnimation: (anim) => set({ avatarAnimation: anim }),
   setLipSyncEnergy: (energy) => set({ lipSyncEnergy: energy }),
-  reset: () => set({ stage: 'idle', error: null, avatarAnimation: 'idle', lipSyncEnergy: 0 }),
+  setInputMode: (mode) => set({ inputMode: mode }),
+  setVADStatus: (status) => set({ vadStatus: status }),
+  reset: () =>
+    set({
+      stage: 'idle',
+      error: null,
+      avatarAnimation: 'idle',
+      lipSyncEnergy: 0,
+      inputMode: 'push-to-talk',
+      vadStatus: 'idle',
+    }),
 }));

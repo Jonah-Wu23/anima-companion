@@ -1,5 +1,7 @@
 # MMD Model Registry (Phainon_Demiurge)
 
+- model_id: `model.Phainon_Demiurge`
+
 - 默认用途: 内部验证（internal validation only）
 - 校验日期: 2026-02-14
 - 规范目录名: `assets/models/Phainon_Demiurge/`（计划从 `mmd_download/models/白厄 - 粉3_by_苏酥鱼鱼喵_8a3c921bb1aa6bc3dd653945234cfc9e/` 迁移）
@@ -30,4 +32,11 @@
 来源: `RM.txt`
 
 - `miHoYo/流云景/苏酥鱼鱼`（原文为 `mihoyo/流云景/苏酥鱼鱼`）
+
+## 工程使用边界
+
+- 内部验证: 允许（P3 阶段默认）
+- 对外发布: 仅在完成署名校对并二次复核许可条款后可进入发布候选
+- 可改造范围: 仅限骨骼/权重/物理/贴图优化与性能修复，不得拆件重组到其他角色模型
+- 上线前置: 在角色配置中固定 `model_id` 与资源路径映射，并完成许可复核留档
 

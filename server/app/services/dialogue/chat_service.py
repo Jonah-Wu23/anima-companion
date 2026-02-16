@@ -13,7 +13,7 @@ from app.services.dialogue.gptsapi_anthropic_client import (
     request_messages_completion,
 )
 from app.services.dialogue.llm_output_parser import parse_labeled_response
-from app.services.tts.gpt_sovits_client import GPTSoVITSClientError, synthesize
+from app.services.tts.tts_service import TTSServiceError, synthesize_with_fallback
 
 
 class ChatServiceError(RuntimeError):
@@ -75,7 +75,13 @@ def run_text_chat(
     }
 
 
-def synthesize_assistant_audio_base64(assistant_text: str) -> tuple[str, str]:
+def synthesize_assistant_audio_base64(
+    assistant_text: str,
+    *,
+    force_tts_provider: str = "qwen_clone_tts",
+    qwen_voice_id: str = "",
+    qwen_target_model: str = "",
+) -> tuple[str, str, str]:
     speak_text = _extract_tts_speak_text(assistant_text)
     if not speak_text:
         # 兼容模型未按约定输出 speak 标签时的降级路径，避免整条语音链路失败。
@@ -86,15 +92,32 @@ def synthesize_assistant_audio_base64(assistant_text: str) -> tuple[str, str]:
     if not _has_pronounceable_content(speak_text):
         speak_text = "我在。"
 
-    payload = build_default_tts_payload(speak_text)
+    payload = build_default_tts_payload(
+        speak_text,
+        force_tts_provider=force_tts_provider,
+        qwen_voice_id=qwen_voice_id,
+        qwen_target_model=qwen_target_model,
+    )
     try:
-        audio_bytes, media_type = synthesize(payload)
-    except GPTSoVITSClientError as exc:
+        result = synthesize_with_fallback(
+            text=speak_text,
+            gpt_sovits_payload=payload,
+        )
+        audio_bytes = result.audio_bytes
+        media_type = result.media_type
+        provider = result.provider
+    except TTSServiceError as exc:
         raise ChatServiceError(str(exc)) from exc
-    return media_type, b64encode(audio_bytes).decode("utf-8")
+    return media_type, b64encode(audio_bytes).decode("utf-8"), provider
 
 
-def build_default_tts_payload(text: str) -> dict[str, Any]:
+def build_default_tts_payload(
+    text: str,
+    *,
+    force_tts_provider: str = "qwen_clone_tts",
+    qwen_voice_id: str = "",
+    qwen_target_model: str = "",
+) -> dict[str, Any]:
     settings = get_settings()
     ref_audio_path = _normalize_ref_audio_path(settings.gpt_sovits_default_ref_audio_path)
     payload: dict[str, Any] = {
@@ -120,6 +143,13 @@ def build_default_tts_payload(text: str) -> dict[str, Any]:
         payload["ref_audio_path"] = ref_audio_path
     if settings.gpt_sovits_aux_ref_audio_paths:
         payload["aux_ref_audio_paths"] = list(settings.gpt_sovits_aux_ref_audio_paths)
+    normalized_provider = _normalize_tts_provider(force_tts_provider)
+    if normalized_provider:
+        payload["__force_provider"] = normalized_provider
+    if qwen_voice_id.strip():
+        payload["_qwen_voice_id_override"] = qwen_voice_id.strip()
+    if qwen_target_model.strip():
+        payload["_qwen_target_model_override"] = qwen_target_model.strip()
     return payload
 
 
@@ -219,3 +249,12 @@ def _truncate_text_prefer_punctuation(text: str, max_chars: int) -> str:
     if best_index >= max_chars // 2:
         return head[: best_index + 1].rstrip()
     return head.rstrip()
+
+
+def _normalize_tts_provider(raw_value: str) -> str:
+    text = str(raw_value or "").strip().lower()
+    if text in {"qwen_clone_tts", "gpt_sovits", "cosyvoice_tts"}:
+        return text
+    if text in {"", "auto"}:
+        return "qwen_clone_tts"
+    return "qwen_clone_tts"

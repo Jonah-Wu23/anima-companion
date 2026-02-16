@@ -1,4 +1,14 @@
-export type Emotion = "neutral" | "happy" | "sad" | "angry" | "shy";
+export type Emotion =
+  | "neutral"
+  | "happy"
+  | "sad"
+  | "angry"
+  | "surprised"
+  | "embarrassed"
+  | "excited"
+  | "worried"
+  | "relaxed"
+  | "shy";
 export type Animation = "idle" | "listen" | "think" | "speak" | "happy" | "sad" | "angry";
 export type MemoryType = "preference" | "taboo" | "important_names" | "note";
 
@@ -39,6 +49,9 @@ export interface ChatTextRequest {
   session_id: string;
   persona_id: string;
   user_text: string;
+  tts_provider?: "auto" | "qwen_clone_tts" | "gpt_sovits" | "cosyvoice_tts";
+  qwen_voice_id?: string;
+  qwen_target_model?: string;
 }
 
 export interface ChatTextResponse {
@@ -54,6 +67,7 @@ export interface ChatTextVoiceResponse extends ChatTextResponse {
   tts_media_type: string;
   tts_audio_base64: string;
   tts_error?: string | null;
+  tts_provider?: string | null;
 }
 
 export interface ChatVoiceResponse {
@@ -62,6 +76,7 @@ export interface ChatVoiceResponse {
   tts_media_type: string;
   tts_audio_base64: string;
   tts_error?: string | null;
+  tts_provider?: string | null;
   emotion: Emotion;
   animation: Animation;
 }
