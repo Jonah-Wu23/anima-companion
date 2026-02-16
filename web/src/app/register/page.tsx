@@ -8,6 +8,7 @@ import { Sparkles, UserPlus, Smartphone, KeyRound, Lock, ChevronRight, AlertCirc
 
 import { verifyAliyunCaptcha } from "@/lib/auth/aliyun-captcha";
 import { api } from "@/lib/api/client";
+import { useLegalDocumentModal } from "@/components/legal/use-legal-document-modal";
 
 function normalizePhone(input: string): string {
   return input.replace(/[^0-9]/g, "");
@@ -31,6 +32,7 @@ function getPasswordStrengthLabel(score: number): string {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { legalDocs, openLegalDocument, legalDocumentModal } = useLegalDocumentModal();
   const [isLoaded, setIsLoaded] = useState(false);
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
@@ -263,7 +265,33 @@ export default function RegisterPage() {
                   onChange={(event) => setAgreed(event.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
                 />
-                <span>我已阅读并同意《服务条款》《隐私政策》</span>
+                <span>
+                  我已阅读并同意《
+                  <a
+                    href={legalDocs.terms.href}
+                    className="text-[#2563EB] underline-offset-2 hover:text-[#1D4ED8] hover:underline"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void openLegalDocument("terms");
+                    }}
+                  >
+                    服务条款
+                  </a>
+                  》《
+                  <a
+                    href={legalDocs.privacy.href}
+                    className="text-[#2563EB] underline-offset-2 hover:text-[#1D4ED8] hover:underline"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void openLegalDocument("privacy");
+                    }}
+                  >
+                    隐私政策
+                  </a>
+                  》
+                </span>
               </label>
 
               {error && (
@@ -291,6 +319,7 @@ export default function RegisterPage() {
           </section>
         </div>
       </div>
+      {legalDocumentModal}
     </main>
   );
 }

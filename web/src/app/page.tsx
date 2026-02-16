@@ -13,6 +13,8 @@ import {
   Sparkles
 } from "lucide-react";
 
+import { useLegalDocumentModal } from "@/components/legal/use-legal-document-modal";
+
 const features = [
   {
     icon: MessageCircle,
@@ -38,6 +40,7 @@ const features = [
 
 export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const { legalDocs, openLegalDocument, legalDocumentModal } = useLegalDocumentModal();
 
   useEffect(() => {
     setIsLoaded(true);
@@ -303,15 +306,34 @@ export default function HomePage() {
             <div className="flex items-center gap-6 text-sm text-[#64748B]">
               <Link href="/login" className="hover:text-[#1E293B] transition-colors duration-200">登录</Link>
               <Link href="/register" className="hover:text-[#1E293B] transition-colors duration-200">注册</Link>
-              <a href="#" className="hover:text-[#1E293B] transition-colors duration-200">服务条款</a>
-              <a href="#" className="hover:text-[#1E293B] transition-colors duration-200">隐私政策</a>
+              <a
+                href={legalDocs.terms.href}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openLegalDocument("terms");
+                }}
+                className="hover:text-[#1E293B] transition-colors duration-200"
+              >
+                服务条款
+              </a>
+              <a
+                href={legalDocs.privacy.href}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openLegalDocument("privacy");
+                }}
+                className="hover:text-[#1E293B] transition-colors duration-200"
+              >
+                隐私政策
+              </a>
             </div>
             <div className="text-sm text-[#94A3B8]">
-              © 2025
+              © 2026 Jonah Wu, All rights reserved。
             </div>
           </div>
         </div>
       </footer>
+      {legalDocumentModal}
     </main>
   );
 }
