@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import VipModal from '@/components/VipModal';
 import { cn } from '@/lib/utils';
+import { generateClientId } from '@/lib/utils/generate-client-id';
 import { api } from '@/lib/api/client';
 import type { Animation, ChatTextVoiceResponse, Emotion } from '@/lib/api/types';
 import { VADRecorder } from '@/lib/audio/vad-recorder';
@@ -710,14 +711,14 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     setStage('processing');
 
     addMessage({
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       role: 'user',
       content: response.transcript_text || '（语音消息）',
       createdAt: Date.now(),
     });
 
     addMessage({
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       role: 'assistant',
       content: response.assistant_text,
       createdAt: Date.now(),
@@ -949,7 +950,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     stopPlaybackAndLipSync();
 
     addMessage({
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       role: 'user',
       content: textToSend,
       createdAt: Date.now(),
@@ -975,7 +976,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
           });
 
       addMessage({
-        id: crypto.randomUUID(),
+        id: generateClientId(),
         role: 'assistant',
         content: response.assistant_text,
         createdAt: Date.now(),

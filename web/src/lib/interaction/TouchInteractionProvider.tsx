@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { usePipelineStore } from '@/lib/store/pipelineStore';
+import { generateClientId } from '@/lib/utils/generate-client-id';
 
 // ============================================================================
 // Types
@@ -298,7 +299,7 @@ export function TouchInteractionProvider({ children }: TouchInteractionProviderP
     const zone = zoneId ? hitZonesRef.current.get(zoneId) : null;
     
     const gesture: ClickGesture = {
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       type: 'doubleClick',
       position,
       startTime: Date.now(),
@@ -370,7 +371,7 @@ export function TouchInteractionProvider({ children }: TouchInteractionProviderP
       }
 
       const gesture: ClickGesture = {
-        id: crypto.randomUUID(),
+        id: generateClientId(),
         type: 'click',
         position,
         startTime: now,
@@ -421,7 +422,7 @@ export function TouchInteractionProvider({ children }: TouchInteractionProviderP
     const zone = zoneId ? hitZonesRef.current.get(zoneId) : null;
     
     const gesture: ClickGesture = {
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       type: 'longPress',
       position,
       startTime: Date.now(),
@@ -456,7 +457,7 @@ export function TouchInteractionProvider({ children }: TouchInteractionProviderP
     const zone = zoneId ? hitZonesRef.current.get(zoneId) : null;
     
     const gesture: DragGesture = {
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       type: 'drag',
       position,
       startPosition: position,
@@ -525,7 +526,7 @@ export function TouchInteractionProvider({ children }: TouchInteractionProviderP
     const zone = zoneId ? hitZonesRef.current.get(zoneId) : null;
     
     const gesture: HoverGesture = {
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       type: 'hover',
       position,
       startTime: Date.now(),

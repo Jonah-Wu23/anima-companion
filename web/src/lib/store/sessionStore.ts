@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Emotion, RelationshipDelta } from '../api/types';
+import { generateClientId } from '@/lib/utils/generate-client-id';
 
 export interface Message {
   id: string;
@@ -23,7 +24,7 @@ interface SessionState {
 export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
-      sessionId: typeof crypto !== 'undefined' ? crypto.randomUUID() : 'default-session',
+      sessionId: generateClientId(),
       messages: [],
       relationship: { trust: 0, reliance: 0, fatigue: 0 },
       setSessionId: (id) => set({ sessionId: id }),
@@ -36,7 +37,7 @@ export const useSessionStore = create<SessionState>()(
         }
       })),
       clearSession: () => set({ 
-        sessionId: typeof crypto !== 'undefined' ? crypto.randomUUID() : 'default-session', 
+        sessionId: generateClientId(), 
         messages: [], 
         relationship: { trust: 0, reliance: 0, fatigue: 0 } 
       }),

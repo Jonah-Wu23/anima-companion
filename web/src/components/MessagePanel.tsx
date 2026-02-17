@@ -4,6 +4,7 @@ import { useSessionStore } from '@/lib/store/sessionStore';
 import { usePipelineStore } from '@/lib/store/pipelineStore';
 import { useAvatarStore } from '@/lib/store/avatarStore';
 import { cn } from '@/lib/utils';
+import { generateClientId } from '@/lib/utils/generate-client-id';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar';
 import { Sparkles, MessageSquare, Mic, Smile } from 'lucide-react';
 import { api } from '@/lib/api/client';
@@ -48,7 +49,7 @@ export function MessagePanel() {
     if (!text.trim() || isBusy) return;
 
     addMessage({
-      id: crypto.randomUUID(),
+      id: generateClientId(),
       role: 'user',
       content: text,
       createdAt: Date.now(),
@@ -63,7 +64,7 @@ export function MessagePanel() {
       });
 
       addMessage({
-        id: crypto.randomUUID(),
+        id: generateClientId(),
         role: 'assistant',
         content: response.assistant_text,
         createdAt: Date.now(),

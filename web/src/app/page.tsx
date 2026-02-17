@@ -296,39 +296,52 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="relative py-10 px-6 border-t border-slate-200">
         <div className="mx-auto max-w-5xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#3B82F6] rounded-lg flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-[#2563EB] to-[#3B82F6] rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-semibold text-[#1E293B]">二次元情感陪伴助手</span>
               </div>
-              <span className="font-semibold text-[#1E293B]">二次元情感陪伴助手</span>
+              <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-[#64748B]">
+                <Link href="/login" className="hover:text-[#1E293B] transition-colors duration-200">登录</Link>
+                <Link href="/register" className="hover:text-[#1E293B] transition-colors duration-200">注册</Link>
+                <a
+                  href={legalDocs.terms.href}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void openLegalDocument("terms");
+                  }}
+                  className="hover:text-[#1E293B] transition-colors duration-200"
+                >
+                  服务条款
+                </a>
+                <a
+                  href={legalDocs.privacy.href}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void openLegalDocument("privacy");
+                  }}
+                  className="hover:text-[#1E293B] transition-colors duration-200"
+                >
+                  隐私政策
+                </a>
+                <a
+                  href="https://github.com/Jonah-Wu23/anima-companion"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#1E293B] transition-colors duration-200"
+                >
+                  GitHub仓库
+                </a>
+              </div>
             </div>
-            <div className="flex items-center gap-6 text-sm text-[#64748B]">
-              <Link href="/login" className="hover:text-[#1E293B] transition-colors duration-200">登录</Link>
-              <Link href="/register" className="hover:text-[#1E293B] transition-colors duration-200">注册</Link>
-              <a
-                href={legalDocs.terms.href}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openLegalDocument("terms");
-                }}
-                className="hover:text-[#1E293B] transition-colors duration-200"
-              >
-                服务条款
-              </a>
-              <a
-                href={legalDocs.privacy.href}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void openLegalDocument("privacy");
-                }}
-                className="hover:text-[#1E293B] transition-colors duration-200"
-              >
-                隐私政策
-              </a>
-            </div>
-            <div className="text-sm text-[#94A3B8]">
-              © 2026 Jonah Wu, All rights reserved。
+
+            <div className="text-xs leading-6 text-[#94A3B8] text-center md:text-left">
+              <p>© 2026 二次元情感陪伴助手 | Developed by Jonah Wu | [闽ICP备XXXXXXXX号]（先占位）</p>
+              <p>本项目为《崩坏：星穹铁道》非官方同人作品。</p>
+              <p>© 米哈游版权所有。《崩坏：星穹铁道》素材的权利归米哈游所有，其他内容的相关权利、利益均归各自所有者享有</p>
             </div>
           </div>
         </div>
