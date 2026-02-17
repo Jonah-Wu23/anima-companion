@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "anima-companion-server"
 version = "0.1.0"
@@ -13,6 +17,14 @@ dependencies = [
   "python-multipart>=0.0.20",
   "uvicorn>=0.30.0",
 ]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["deploy*", "tests*", "scripts*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
