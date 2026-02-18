@@ -1,9 +1,11 @@
 import type { AlbumSnapshot } from '@/lib/album/types';
+import type { CharacterId } from '@/lib/characters/types';
 
 interface CaptureOptions {
   title?: string;
   width?: number;
   height?: number;
+  characterId?: CharacterId;
 }
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -56,6 +58,7 @@ export const albumApi = {
     if (options.title) formData.append('title', options.title);
     if (options.width) formData.append('width', String(options.width));
     if (options.height) formData.append('height', String(options.height));
+    if (options.characterId) formData.append('character_id', options.characterId);
 
     const response = await fetch('/api/album/capture', {
       method: 'POST',

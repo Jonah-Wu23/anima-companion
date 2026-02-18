@@ -8,8 +8,8 @@ import { generateClientId } from '@/lib/utils/generate-client-id';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/Avatar';
 import { Sparkles, MessageSquare, Mic, Smile } from 'lucide-react';
 import { api } from '@/lib/api/client';
-
-const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
+import { getCharacterById, getCharacterPersonaId } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 
 function extractApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
@@ -34,8 +34,11 @@ export function MessagePanel() {
   const setError = usePipelineStore((state) => state.setError);
   const setAvatarAnimation = usePipelineStore((state) => state.setAvatarAnimation);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentCharacter = getCharacterById(currentCharacterId);
+  const personaId = getCharacterPersonaId(currentCharacterId);
 
   // Auto-scroll to bottom on new messages or stage change
   useEffect(() => {
@@ -59,7 +62,7 @@ export function MessagePanel() {
     try {
       const response = await api.chatText({
         session_id: sessionId,
-        persona_id: DEFAULT_PERSONA_ID,
+        persona_id: personaId,
         user_text: text,
       });
 
@@ -77,7 +80,7 @@ export function MessagePanel() {
       setError(extractApiErrorMessage(error, '发送失败，请重试'));
       setStage('error');
     }
-  }, [addMessage, isBusy, sessionId, setAvatarAnimation, setAvatarEmotion, setError, setStage]);
+  }, [addMessage, isBusy, personaId, sessionId, setAvatarAnimation, setAvatarEmotion, setError, setStage]);
 
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden bg-transparent">
@@ -96,7 +99,7 @@ export function MessagePanel() {
             </div>
             
             <div className="text-center space-y-2">
-              <h3 className="text-lg font-medium text-slate-800">开始与白厄的对话</h3>
+              <h3 className="text-lg font-medium text-slate-800">开始与{currentCharacter.name}的对话</h3>
               <p className="text-sm text-slate-500 max-w-[240px]">
                 我可以陪你聊天、讲故事，或者只是安静地听你说。
               </p>
@@ -140,9 +143,9 @@ export function MessagePanel() {
               )}>
                 {/* Avatar */}
                 <Avatar className="w-8 h-8 mt-1 border border-white shadow-sm">
-                  {!isUser && <AvatarImage src="/assets/phainon-profile.jpg" alt="白厄头像" />}
+                  {!isUser && <AvatarImage src={currentCharacter.profileImage} alt={`${currentCharacter.name}头像`} />}
                   <AvatarFallback className={isUser ? "bg-blue-100 text-blue-600" : "bg-pink-100 text-pink-600"}>
-                    {isUser ? "你" : "白"}
+                    {isUser ? "你" : currentCharacter.fallbackShortName}
                   </AvatarFallback>
                 </Avatar>
 
@@ -153,7 +156,7 @@ export function MessagePanel() {
                   {/* Name & Emotion Badge (Assistant only) */}
                   {!isUser && (
                     <div className="flex items-center gap-2 px-1">
-                      <span className="text-xs font-medium text-slate-500">白厄</span>
+                      <span className="text-xs font-medium text-slate-500">{currentCharacter.name}</span>
                       {msg.emotion && msg.emotion !== 'neutral' && (
                         <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-pink-50 text-pink-600 border border-pink-100">
                           <Smile className="w-3 h-3" />
@@ -190,13 +193,13 @@ export function MessagePanel() {
           <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-4 duration-300">
              <div className="flex max-w-[85%] gap-3 flex-row">
                 <Avatar className="w-8 h-8 mt-1 border border-white shadow-sm">
-                  <AvatarImage src="/assets/phainon-profile.jpg" alt="白厄头像" />
-                  <AvatarFallback className="bg-pink-100 text-pink-600">白</AvatarFallback>
+                  <AvatarImage src={currentCharacter.profileImage} alt={`${currentCharacter.name}头像`} />
+                  <AvatarFallback className="bg-pink-100 text-pink-600">{currentCharacter.fallbackShortName}</AvatarFallback>
                 </Avatar>
                 
                 <div className="flex flex-col gap-1 items-start">
                   <div className="flex items-center gap-2 px-1">
-                     <span className="text-xs font-medium text-slate-500">白厄</span>
+                     <span className="text-xs font-medium text-slate-500">{currentCharacter.name}</span>
                      <span className="text-[10px] text-slate-400">正在思考...</span>
                   </div>
                   <div className="bg-white/80 backdrop-blur-md border border-white/40 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">

@@ -40,11 +40,20 @@ const features = [
 
 export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [heroIndex, setHeroIndex] = useState(0);
   const { legalDocs, openLegalDocument, legalDocumentModal } = useLegalDocumentModal();
+  const heroBackgrounds = ['/images/hero.png', '/images/hero-luotianyi-illustration-01.jpg'];
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroBackgrounds.length);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [heroBackgrounds.length]);
 
   return (
     <main className="relative min-h-screen bg-[#F8FAFC] overflow-x-hidden">
@@ -86,32 +95,36 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative pt-32 pb-24 md:pt-40 md:pb-32 px-6 overflow-hidden">
         {/* Hero Background Image */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(/images/hero.png)' }}
-        />
+        <div className="absolute inset-0">
+          {heroBackgrounds.map((background, index) => (
+            <div
+              key={background}
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
+              style={{
+                backgroundImage: `url(${background})`,
+                opacity: heroIndex === index ? 1 : 0,
+              }}
+            />
+          ))}
+        </div>
         <div className="absolute inset-0 bg-gradient-to-b from-[#F8FAFC]/70 via-[#F8FAFC]/50 to-[#F8FAFC]" />
         
         <div className="relative mx-auto max-w-5xl">
           <div className="text-center max-w-2xl mx-auto">
             {/* Badge */}
             <div className={`inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm mb-8 transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-              <span className="text-sm font-medium text-[#475569]">完全免费，无需付费</span>
+              <span className="text-sm font-medium text-[#475569]">❤️ 永久免费 · 为爱发电</span>
             </div>
 
             {/* Title */}
             <h1 className={`text-4xl md:text-5xl lg:text-6xl font-bold text-[#1E293B] leading-[1.15] mb-6 transition-all duration-500 delay-100 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              遇见
-              <span className="text-[#2563EB]">白厄</span>
-              <span className="block mt-2">你的专属陪伴</span>
+              跨越次元
+              <span className="block mt-2 text-[#2563EB]">遇见羁绊</span>
             </h1>
 
             {/* Subtitle */}
             <p className={`text-lg text-[#475569] max-w-lg mx-auto mb-10 leading-relaxed transition-all duration-500 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              文字对话、语音交流、3D互动，
-              <br className="hidden sm:block" />
-              每一次交流都温暖而有意义
+              支持 文字对话、语音通话、3D互动，选择你心动的角色，开启一段温暖而有意义的旅程
             </p>
 
             {/* CTA Buttons */}
@@ -339,9 +352,9 @@ export default function HomePage() {
             </div>
 
             <div className="text-xs leading-6 text-[#94A3B8] text-center md:text-left">
-              <p>© 2026 二次元情感陪伴助手 | Developed by Jonah Wu | [闽ICP备XXXXXXXX号]（先占位）</p>
-              <p>本项目为《崩坏：星穹铁道》非官方同人作品。</p>
-              <p>© 米哈游版权所有。《崩坏：星穹铁道》素材的权利归米哈游所有，其他内容的相关权利、利益均归各自所有者享有</p>
+              <p>© 2026 二次元情感陪伴助手. All rights reserved.</p>
+              <p>本项目聚焦二次元角色互动体验，相关角色与素材版权归各自权利人所有。</p>
+              <p>如涉及侵权、授权或内容异议，请通过 GitHub 仓库反馈处理。</p>
             </div>
           </div>
         </div>

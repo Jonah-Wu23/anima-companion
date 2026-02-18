@@ -10,6 +10,7 @@ interface ClipPlaybackOptions {
 interface MMDAnimationManagerOptions {
   fadeDuration?: number;
   lipSyncMorphs?: LipSyncMorphs;
+  usePhysics?: boolean;
 }
 
 interface AnimationActionSnapshot {
@@ -45,7 +46,7 @@ export class MMDAnimationManager {
     private readonly mesh: THREE.SkinnedMesh,
     private readonly options: MMDAnimationManagerOptions = {}
   ) {
-    this.helper.add(mesh, { physics: false });
+    this.helper.add(mesh, { physics: options.usePhysics ?? false });
 
     const helperObjects = (this.helper as unknown as { objects: WeakMap<THREE.SkinnedMesh, HelperObject> }).objects;
     const helperObject = helperObjects.get(mesh);

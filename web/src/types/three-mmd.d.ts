@@ -39,3 +39,8 @@ declare module '@/lib/vendor/mmd/MMDAnimationHelper.js' {
     update(delta: number): void;
   }
 }
+
+declare module 'three/examples/jsm/libs/ammo.wasm.js' {
+  const AmmoFactory: () => Promise<unknown>;
+  export default AmmoFactory;
+}

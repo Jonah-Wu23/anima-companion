@@ -17,6 +17,9 @@ class GPTSAPIAnthropicClientError(RuntimeError):
 
 
 DEFAULT_ASSISTANT_CHAR_LIMIT = 50
+PERSONA_ASSISTANT_CHAR_LIMITS = {
+    "luotianyi": 60,
+}
 
 
 def request_messages_completion(
@@ -121,32 +124,35 @@ def _build_system_prompt(
     *,
     include_initial_injection: bool = True,
 ) -> str:
-    persona = load_persona_prompt_context(persona_id) if include_initial_injection else None
+    persona = load_persona_prompt_context(persona_id)
     assistant_char_limit = _resolve_assistant_char_limit(persona_id)
     global_injection_part = _load_global_dialogue_rules()
-    persona_part = ""
-    if include_initial_injection:
-        persona_part = (
-            f"当前 persona_id={persona_id}。"
-            if persona is None
-            else (
-                f"当前 persona_id={persona_id}，角色名={persona.display_name}。"
-                f"角色简介：{persona.description}"
-                f"角色性格：{persona.personality}"
-                f"角色场景：{persona.scenario}"
-                f"{_format_optional_prompt_block('角色开场白参考（仅首轮）', persona.first_message)}"
-                f"{_format_optional_prompt_block('角色对话示例（仅首轮）', persona.mes_example)}"
-                f"{_format_optional_prompt_block('角色世界书（仅首轮）', persona.character_book)}"
-                f"角色系统提示：{persona.system_prompt}"
-                f"{_format_optional_prompt_block('角色总注入（仅首轮）', persona.ai_initial_injection)}"
-                f"{_format_optional_prompt_block('角色AI补充材料（仅首轮）', persona.ai_additional_info)}"
-                f"{_format_optional_prompt_block('角色AI需要遵循（仅首轮）', persona.ai_need_to_follow)}"
-            )
+    persona_core_part = (
+        f"当前 persona_id={persona_id}。"
+        if persona is None
+        else (
+            f"当前 persona_id={persona_id}，角色名={persona.display_name}。"
+            f"角色核心设定：{_build_persona_anchor_summary(persona)}"
+            f"身份约束：你只能以“{persona.display_name}”身份回应，禁止自称其他名字或其他角色。"
+            f"当用户询问你的姓名或身份时，必须明确回答“我是{persona.display_name}”。"
+        )
+    )
+    persona_initial_part = ""
+    if include_initial_injection and persona is not None:
+        persona_initial_part = (
+            f"{_format_optional_prompt_block('角色开场白参考（仅首轮）', persona.first_message)}"
+            f"{_format_optional_prompt_block('角色对话示例（仅首轮）', persona.mes_example)}"
+            f"{_format_optional_prompt_block('角色世界书（仅首轮）', persona.character_book)}"
+            f"角色系统提示：{persona.system_prompt}"
+            f"{_format_optional_prompt_block('角色总注入（仅首轮）', persona.ai_initial_injection)}"
+            f"{_format_optional_prompt_block('角色AI补充材料（仅首轮）', persona.ai_additional_info)}"
+            f"{_format_optional_prompt_block('角色AI需要遵循（仅首轮）', persona.ai_need_to_follow)}"
         )
     return (
         "你是陪伴助手角色，必须稳定遵循指定角色设定，默认使用中文回复。"
         f"{global_injection_part}"
-        f"{persona_part}"
+        f"{persona_core_part}"
+        f"{persona_initial_part}"
         f"当前关系值={relationship}。"
         "assistant 内容中，真正说出口的台词必须放入 <speak>...</speak>。"
         "动作、心理、场景、旁白必须写在 <speak> 标签外。"
@@ -162,8 +168,10 @@ def _build_system_prompt(
 
 
 def _resolve_assistant_char_limit(persona_id: str) -> int:
-    _ = persona_id
-    return DEFAULT_ASSISTANT_CHAR_LIMIT
+    normalized = str(persona_id or "").strip().lower()
+    if not normalized:
+        return DEFAULT_ASSISTANT_CHAR_LIMIT
+    return PERSONA_ASSISTANT_CHAR_LIMITS.get(normalized, DEFAULT_ASSISTANT_CHAR_LIMIT)
 
 
 def _format_optional_prompt_block(title: str, content: str) -> str:
@@ -171,6 +179,23 @@ def _format_optional_prompt_block(title: str, content: str) -> str:
     if not text:
         return ""
     return f"{title}：{text}"
+
+
+def _clip_anchor_text(text: str, max_length: int = 120) -> str:
+    normalized = " ".join(str(text or "").split())
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[: max_length - 1].rstrip() + "…"
+
+
+def _build_persona_anchor_summary(persona: Any) -> str:
+    description = _clip_anchor_text(getattr(persona, "description", ""), 120)
+    personality = _clip_anchor_text(getattr(persona, "personality", ""), 120)
+    scenario = _clip_anchor_text(getattr(persona, "scenario", ""), 120)
+    parts = [part for part in (description, personality, scenario) if part]
+    if not parts:
+        return "无额外摘要。"
+    return " ".join(parts)
 
 
 @lru_cache(maxsize=1)

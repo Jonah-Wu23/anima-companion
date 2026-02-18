@@ -68,7 +68,7 @@ export function GalleryGrid({
         </div>
         <h3 className="text-lg font-medium text-slate-700 mb-1">暂无回忆</h3>
         <p className="text-sm text-slate-500 text-center max-w-xs">
-          在主页面与白厄互动时，点击截图按钮保存美好瞬间
+          在陪伴页面互动时，点击截图按钮保存美好瞬间
         </p>
       </div>
     );

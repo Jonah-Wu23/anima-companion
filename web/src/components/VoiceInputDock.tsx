@@ -17,6 +17,8 @@ import { api } from '@/lib/api/client';
 import type { Animation, ChatTextVoiceResponse, Emotion } from '@/lib/api/types';
 import { VADRecorder } from '@/lib/audio/vad-recorder';
 import { TouchFeedback, TouchFeedbackStyles } from '@/components/interaction/TouchFeedback';
+import { getCharacterById, getCharacterPersonaId } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 
 // ============================================================================
 // Types & Constants
@@ -27,10 +29,7 @@ type WebkitWindow = Window & typeof globalThis & {
   __testLipSync?: (energy?: number) => number;
 };
 
-const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
 const REQUIRED_TTS_PROVIDER = 'qwen_clone_tts';
-const DEFAULT_QWEN_VOICE_ID = (process.env.NEXT_PUBLIC_QWEN_VOICE_ID || '').trim();
-const DEFAULT_QWEN_TARGET_MODEL = (process.env.NEXT_PUBLIC_QWEN_TARGET_MODEL || '').trim();
 const PRESS_TO_TALK_MIN_RELEASE_MS = 250;
 
 const VOICE_MODE_LABELS: Record<InputMode, { label: string; desc: string; icon: React.ReactNode }> = {
@@ -485,9 +484,14 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   // Store
   const sessionId = useSessionStore((state) => state.sessionId);
   const addMessage = useSessionStore((state) => state.addMessage);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
+  const currentCharacter = getCharacterById(currentCharacterId);
+  const personaId = getCharacterPersonaId(currentCharacterId);
+  const qwenVoiceId = currentCharacter.tts.qwenVoiceId;
+  const qwenTargetModel = currentCharacter.tts.qwenTargetModel;
   
   const {
     stage,
@@ -514,6 +518,13 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const isPushToTalkMode = inputMode === 'push-to-talk';
   const isVADActive = isVADMode && vadStatus !== 'idle';
   const vadConfig = VAD_STATUS_CONFIG[vadStatus];
+  const qwenTtsPayload = useMemo(
+    () => ({
+      ...(qwenVoiceId ? { qwen_voice_id: qwenVoiceId } : {}),
+      ...(qwenTargetModel ? { qwen_target_model: qwenTargetModel } : {}),
+    }),
+    [qwenTargetModel, qwenVoiceId],
+  );
 
   // ==========================================================================
   // Audio & LipSync
@@ -702,10 +713,9 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
 
     setStage('uploading');
 
-    const response = await api.chatVoice(sessionId, DEFAULT_PERSONA_ID, wavBlob, {
+    const response = await api.chatVoice(sessionId, personaId, wavBlob, {
       tts_provider: REQUIRED_TTS_PROVIDER,
-      qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
-      qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
+      ...qwenTtsPayload,
     });
 
     setStage('processing');
@@ -744,7 +754,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     }
 
     setStage('idle');
-  }, [sessionId, addMessage, applyAssistantState, playAssistantAudioBase64, setError, setStage]);
+  }, [sessionId, addMessage, applyAssistantState, personaId, playAssistantAudioBase64, qwenTtsPayload, setError, setStage]);
   submitVoiceBlobRef.current = submitVoiceBlob;
 
   // ==========================================================================
@@ -963,15 +973,14 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       const response = canUseVipVoice
         ? await api.chatTextWithVoice({
             session_id: sessionId,
-            persona_id: DEFAULT_PERSONA_ID,
+            persona_id: personaId,
             user_text: textToSend,
             tts_provider: REQUIRED_TTS_PROVIDER,
-            qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
-            qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
+            ...qwenTtsPayload,
           })
         : await api.chatText({
             session_id: sessionId,
-            persona_id: DEFAULT_PERSONA_ID,
+            persona_id: personaId,
             user_text: textToSend
           });
 
@@ -1012,7 +1021,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64]);
+  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64, personaId, qwenTtsPayload]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

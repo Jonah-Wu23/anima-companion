@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AlbumEvent, AlbumItem, AlbumSettings, AlbumSnapshot } from '@/lib/album/types';
+import type { CharacterId } from '@/lib/characters/types';
 
 interface StoredAlbumItem extends Omit<AlbumItem, 'url'> {}
 
@@ -21,6 +22,7 @@ interface CapturePayload {
   title?: string;
   width?: number;
   height?: number;
+  characterId?: CharacterId | null;
 }
 
 const REPO_ROOT = path.resolve(process.cwd(), '..');
@@ -29,6 +31,7 @@ const STORE_DIR = path.resolve(REPO_ROOT, 'data', 'album');
 const STORE_FILE = path.resolve(STORE_DIR, 'store.json');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const MAX_EVENTS = 400;
+const STORE_VERSION = 2;
 
 let ioQueue: Promise<unknown> = Promise.resolve();
 
@@ -93,6 +96,31 @@ function buildPhotoUrl(filename: string): string {
   return `/api/local-files/assets/photos/${encodeURIComponent(filename)}`;
 }
 
+function normalizeCharacterId(value: unknown): CharacterId | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim();
+  if (normalized === 'phainon' || normalized === 'luotianyi') {
+    return normalized;
+  }
+  return null;
+}
+
+function inferCharacterIdByFilename(filename: string): CharacterId | null {
+  const normalized = filename.toLowerCase();
+  if (normalized.startsWith('phainon-')) {
+    return 'phainon';
+  }
+  if (normalized.startsWith('luotianyi-')) {
+    return 'luotianyi';
+  }
+  return null;
+}
+
 function toSnapshot(store: AlbumStoreFile): AlbumSnapshot {
   return {
     settings: store.settings,
@@ -109,7 +137,7 @@ function toSnapshot(store: AlbumStoreFile): AlbumSnapshot {
 function createDefaultStore(): AlbumStoreFile {
   const createdAt = nowIso();
   return {
-    version: 1,
+    version: STORE_VERSION,
     settings: {
       privacyEnabled: true,
       updatedAt: createdAt,
@@ -119,23 +147,78 @@ function createDefaultStore(): AlbumStoreFile {
   };
 }
 
+function sanitizeStoredItem(raw: Partial<StoredAlbumItem>): StoredAlbumItem | null {
+  const filename = typeof raw.filename === 'string' ? raw.filename.trim() : '';
+  if (!filename) {
+    return null;
+  }
+
+  const inferredCharacterId = inferCharacterIdByFilename(filename);
+  const normalizedCharacterId = normalizeCharacterId(raw.characterId);
+  const now = nowIso();
+
+  return {
+    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id : randomUUID(),
+    filename,
+    title: normalizeTitle(typeof raw.title === 'string' ? raw.title : undefined, inferPhotoTitle(filename)),
+    source: raw.source === 'screenshot' ? 'screenshot' : 'imported',
+    mimeType: typeof raw.mimeType === 'string' && raw.mimeType.trim() ? raw.mimeType : inferMimeType(filename),
+    sizeBytes: typeof raw.sizeBytes === 'number' && Number.isFinite(raw.sizeBytes) ? Math.max(0, raw.sizeBytes) : 0,
+    capturedAt: typeof raw.capturedAt === 'string' && raw.capturedAt.trim() ? raw.capturedAt : now,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === 'string' && raw.updatedAt.trim() ? raw.updatedAt : now,
+    characterId: normalizedCharacterId ?? inferredCharacterId,
+  };
+}
+
 function parseStore(raw: string): AlbumStoreFile {
   const fallback = createDefaultStore();
   try {
     const parsed = JSON.parse(raw) as Partial<AlbumStoreFile>;
     const settings = parsed.settings ?? fallback.settings;
-    return {
-      version: 1,
+    const items = Array.isArray(parsed.items)
+      ? parsed.items
+          .map((item) => sanitizeStoredItem(item as Partial<StoredAlbumItem>))
+          .filter((item): item is StoredAlbumItem => item !== null)
+      : [];
+    const nextStore: AlbumStoreFile = {
+      version: Number.isFinite(parsed.version) ? Number(parsed.version) : 1,
       settings: {
         privacyEnabled: typeof settings.privacyEnabled === 'boolean' ? settings.privacyEnabled : true,
         updatedAt: typeof settings.updatedAt === 'string' ? settings.updatedAt : fallback.settings.updatedAt,
       },
-      items: Array.isArray(parsed.items) ? (parsed.items as StoredAlbumItem[]) : [],
+      items,
       events: Array.isArray(parsed.events) ? (parsed.events as AlbumEvent[]) : [],
     };
+    migrateStore(nextStore);
+    return nextStore;
   } catch {
     return fallback;
   }
+}
+
+function migrateStore(store: AlbumStoreFile): boolean {
+  let changed = false;
+
+  if (store.version !== STORE_VERSION) {
+    store.version = STORE_VERSION;
+    changed = true;
+  }
+
+  for (const item of store.items) {
+    const normalizedCharacterId = normalizeCharacterId(item.characterId);
+    if (normalizedCharacterId !== undefined) {
+      if (item.characterId !== normalizedCharacterId) {
+        item.characterId = normalizedCharacterId;
+        changed = true;
+      }
+      continue;
+    }
+    item.characterId = inferCharacterIdByFilename(item.filename);
+    changed = true;
+  }
+
+  return changed;
 }
 
 async function ensureStorageDirs(): Promise<void> {
@@ -178,7 +261,7 @@ async function syncItemsFromDirectory(store: AlbumStoreFile): Promise<boolean> {
     .filter((name) => IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase()));
   const diskSet = new Set(diskFiles);
   const byFilename = new Map(store.items.map((item) => [item.filename, item]));
-  let changed = false;
+  let changed = migrateStore(store);
 
   for (const filename of diskFiles) {
     const existing = byFilename.get(filename);
@@ -186,6 +269,7 @@ async function syncItemsFromDirectory(store: AlbumStoreFile): Promise<boolean> {
     const fileStat = await stat(filePath);
     const capturedAt = fileStat.mtime.toISOString();
     const mimeType = inferMimeType(filename);
+    const inferredCharacterId = inferCharacterIdByFilename(filename);
 
     if (!existing) {
       const nextItem: StoredAlbumItem = {
@@ -198,6 +282,7 @@ async function syncItemsFromDirectory(store: AlbumStoreFile): Promise<boolean> {
         capturedAt,
         createdAt: nowIso(),
         updatedAt: nowIso(),
+        characterId: inferredCharacterId,
       };
       store.items.push(nextItem);
       changed = true;
@@ -206,6 +291,7 @@ async function syncItemsFromDirectory(store: AlbumStoreFile): Promise<boolean> {
           type: 'photo_imported',
           itemId: nextItem.id,
           note: `检测到新图片：${filename}`,
+          payload: { characterId: nextItem.characterId ?? null },
         });
       }
       continue;
@@ -220,6 +306,11 @@ async function syncItemsFromDirectory(store: AlbumStoreFile): Promise<boolean> {
       existing.mimeType = mimeType;
       existing.capturedAt = capturedAt;
       existing.updatedAt = nowIso();
+      changed = true;
+    }
+
+    if (existing.characterId === undefined) {
+      existing.characterId = inferredCharacterId;
       changed = true;
     }
   }
@@ -246,9 +337,10 @@ function mimeToExtension(mimeType: string | undefined, originalName: string | un
   return '.png';
 }
 
-async function buildUniqueFilename(extension: string): Promise<string> {
+async function buildUniqueFilename(extension: string, characterId: CharacterId | null): Promise<string> {
+  const prefix = characterId ? `${characterId}-shot` : 'album-shot';
   for (let retry = 0; retry < 6; retry += 1) {
-    const fileName = `album-shot-${formatFileTimestamp(new Date())}-${randomUUID().slice(0, 8)}${extension}`;
+    const fileName = `${prefix}-${formatFileTimestamp(new Date())}-${randomUUID().slice(0, 8)}${extension}`;
     const fullPath = path.resolve(PHOTOS_DIR, fileName);
     try {
       await stat(fullPath);
@@ -256,7 +348,7 @@ async function buildUniqueFilename(extension: string): Promise<string> {
       return fileName;
     }
   }
-  return `album-shot-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
+  return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
 }
 
 export async function getAlbumSnapshot(): Promise<AlbumSnapshot> {
@@ -306,8 +398,9 @@ export async function saveAlbumScreenshot(payload: CapturePayload): Promise<Albu
       throw new AlbumPrivacyDisabledError();
     }
 
+    const normalizedCharacterId = normalizeCharacterId(payload.characterId) ?? null;
     const extension = mimeToExtension(payload.mimeType, payload.originalName);
-    const filename = await buildUniqueFilename(extension);
+    const filename = await buildUniqueFilename(extension, normalizedCharacterId);
     const filePath = path.resolve(PHOTOS_DIR, filename);
     await writeFile(filePath, payload.buffer);
     const fileStat = await stat(filePath);
@@ -323,6 +416,7 @@ export async function saveAlbumScreenshot(payload: CapturePayload): Promise<Albu
       capturedAt: fileStat.mtime.toISOString(),
       createdAt,
       updatedAt: createdAt,
+      characterId: normalizedCharacterId ?? inferCharacterIdByFilename(filename),
     };
 
     store.items.push(nextItem);
@@ -333,6 +427,7 @@ export async function saveAlbumScreenshot(payload: CapturePayload): Promise<Albu
       payload: {
         width: payload.width ?? null,
         height: payload.height ?? null,
+        characterId: nextItem.characterId ?? null,
       },
     });
     await writeStore(store);
@@ -365,8 +460,12 @@ export async function deleteAlbumItem(itemId: string): Promise<AlbumSnapshot> {
       type: 'item_deleted',
       itemId: itemId,
       note: `已删除图片：${removed.filename}`,
+      payload: {
+        characterId: removed.characterId ?? null,
+      },
     });
     await writeStore(store);
     return toSnapshot(store);
   });
 }
+

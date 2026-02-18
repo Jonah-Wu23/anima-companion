@@ -20,6 +20,9 @@ class ChatServiceError(RuntimeError):
     """聊天服务失败。"""
 
 ASSISTANT_TEXT_CHAR_LIMIT = 50
+PERSONA_ASSISTANT_TEXT_CHAR_LIMITS = {
+    "luotianyi": 60,
+}
 
 
 def run_text_chat(
@@ -233,8 +236,10 @@ def _has_pronounceable_content(text: str) -> bool:
 
 
 def _resolve_assistant_text_limit(persona_id: str) -> int:
-    _ = persona_id
-    return ASSISTANT_TEXT_CHAR_LIMIT
+    normalized = str(persona_id or "").strip().lower()
+    if not normalized:
+        return ASSISTANT_TEXT_CHAR_LIMIT
+    return PERSONA_ASSISTANT_TEXT_CHAR_LIMITS.get(normalized, ASSISTANT_TEXT_CHAR_LIMIT)
 
 
 def _truncate_text_prefer_punctuation(text: str, max_chars: int) -> str:
@@ -242,13 +247,30 @@ def _truncate_text_prefer_punctuation(text: str, max_chars: int) -> str:
         return text
 
     head = text[:max_chars]
-    best_index = -1
-    for punctuation in ("。", "，", ".", ","):
-        best_index = max(best_index, head.rfind(punctuation))
+    sentence_end_index = -1
+    for punctuation in ("。", "！", "？", "!", "?", "…"):
+        sentence_end_index = max(sentence_end_index, head.rfind(punctuation))
+    if sentence_end_index >= max_chars // 2:
+        return head[: sentence_end_index + 1].rstrip()
 
-    if best_index >= max_chars // 2:
-        return head[: best_index + 1].rstrip()
-    return head.rstrip()
+    comma_like_index = -1
+    for punctuation in ("，", ",", "、", "；", ";", "：", ":"):
+        comma_like_index = max(comma_like_index, head.rfind(punctuation))
+    if comma_like_index >= max_chars // 2:
+        return _append_ellipsis(head[:comma_like_index].rstrip(), max_chars)
+
+    return _append_ellipsis(head.rstrip(), max_chars)
+
+
+def _append_ellipsis(text: str, max_chars: int) -> str:
+    clean = str(text or "").rstrip()
+    if not clean:
+        return "…"
+    if clean.endswith(("。", "！", "？", "!", "?", "…")):
+        return clean
+    if len(clean) >= max_chars:
+        clean = clean[: max_chars - 1].rstrip()
+    return f"{clean}…"
 
 
 def _normalize_tts_provider(raw_value: str) -> str:

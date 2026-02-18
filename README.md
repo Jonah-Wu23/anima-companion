@@ -16,7 +16,7 @@
 <p align="center">
   <h3 align="center">二次元情感陪伴助手</h3>
   <p align="center">
-    基于《崩坏：星穹铁道》角色的同人情感陪伴应用
+    基于AI技术的二次元角色情感陪伴应用
     <br />
     <a href="docs/README.md"><strong>探索项目文档 »</strong></a>
     <br />
@@ -183,7 +183,7 @@ Jonah Wu (3582584159@qq.com)
 
 ### 素材致谢
 
-- **模型作者**：流云景、FixEll、苏酥鱼鱼喵、随着2时间的推移、林槿、填字小檀桌
+- **模型作者**：流云景、FixEll、苏酥鱼鱼喵、随着2时间的推移、林槿、填字小檀桌、Nanoda、Kinsama、Samsink(机动战士牛肉）
 - **动作提供方**：ot0510_standbypack、背景キャラ用ループ会話モーション、土下座のモーション、腕組みIA.モーション+、ミニモーション集
 
 ### 技术致谢
@@ -194,13 +194,23 @@ Jonah Wu (3582584159@qq.com)
 
 ## 版权说明
 
-### 版权声明
+本项目（二次元情感陪伴助手 / Anima Companion）严格遵循各版权方的同人创作指引进行开发。本项目为粉丝个人作品，**非官方应用**，**严禁商用**。
 
-本项目（二次元情感陪伴助手 / Phainon Companion）为《崩坏：星穹铁道》同人衍生作品，严格遵循 **[《崩坏：星穹铁道》同人衍生作品创作指引 V3.0](https://www.bilibili.com/opus/1089707102255972370)** 进行创作。
+### 1. 《崩坏：星穹铁道》相关（白厄 / Phainon）
+本项目遵循 **[《崩坏：星穹铁道》同人衍生作品创作指引 V3.0](https://www.bilibili.com/opus/1089707102255972370)**。
+- **版权归属**：角色“白厄”、世界观、游戏原文文本、官方美术素材等内容的知识产权均归 **上海米哈游海渊城科技有限公司** 及 **HoYoverse** 所有。
+- **声明**：本项目不代表米哈游官方立场。
 
-- **版权归属**：角色"白厄"、世界观、游戏原文文本、美术素材、音频素材等内容的知识产权均归 **上海米哈游海渊城科技有限公司** 及 **HoYoverse** 所有。
-- **项目性质**：本项目为粉丝个人开发，**非米哈游官方应用**。
-- **严禁商用**：本项目源代码及服务仅供学习交流，**严禁任何形式的商业盈利行为**。
+### 2. Vsinger 相关（洛天依 / Luo Tianyi）
+本项目遵循 **[Vsinger 同人创作规约](https://vsinger.com/aboutus#%E7%89%88%E6%9D%83%E8%AF%B4%E6%98%8E)**。
+- **版权归属**：角色“洛天依”、人物设定、音源及官方多媒体资源的知识产权均归 **上海禾念信息科技有限公司** 所有。
+- **合规声明**：
+    - 本项目不包含任何政治、宗教、负面舆论或有损角色形象的内容。
+    - 本项目未使用 Vsinger 官方 LOGO、商标及签名。
+    - 本项目仅供个人学习与同好交流，属于非实物同人创作，不涉及商业营利。
+
+### 3. 开源协议
+本项目的**代码部分**（不含任何美术素材、音频文件及模型权重）遵循 Apache 2.0 License 开源。
 
 ### 免责声明
 
@@ -219,4 +229,3 @@ Jonah Wu (3582584159@qq.com)
 [issues-url]: https://github.com/Jonah-Wu23/anima-companion/issues
 [license-shield]: https://img.shields.io/github/license/Jonah-Wu23/anima-companion.svg?style=flat-square
 [license-url]: https://github.com/Jonah-Wu23/anima-companion/blob/master/LICENSE
-

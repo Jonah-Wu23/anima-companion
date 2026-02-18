@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "validated_at": "2026-02-18T00:00:00Z",
+  "states": {
+    "Idle": {
+      "candidates": [
+        {
+          "asset_id": "luotianyi_idle_001",
+          "path": "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_素立ち_まばたき付き.vmd",
+          "priority": 1,
+          "fallback": false
+        }
+      ]
+    },
+    "Speaking": {
+      "candidates": [
+        {
+          "asset_id": "luotianyi_speaking_001",
+          "path": "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk8-east-渉.vmd",
+          "priority": 1,
+          "fallback": false
+        },
+        {
+          "asset_id": "luotianyi_speaking_002",
+          "path": "assets/motions/phainon/raw/背景キャラ用ループ会話モーション/背景キャラ用ループ会話モーション/xs-talk4-east-凹.vmd",
+          "priority": 2,
+          "fallback": true
+        }
+      ]
+    },
+    "Listening": {
+      "candidates": [
+        {
+          "asset_id": "luotianyi_listening_001",
+          "path": "assets/motions/phainon/raw/ot0510_standbypack/ot0510_待機_両手後ろ_まばたき付き.vmd",
+          "priority": 1,
+          "fallback": false
+        }
+      ]
+    },
+    "Thinking": {
+      "candidates": [
+        {
+          "asset_id": "luotianyi_thinking_001",
+          "path": "assets/motions/phainon/raw/腕組みIA.モーション+/腕組みIA.モーション+/腕組みIA/腕組みIA.vmd",
+          "priority": 1,
+          "fallback": false
+        },
+        {
+          "asset_id": "luotianyi_thinking_002",
+          "path": "assets/motions/phainon/raw/ot0510_standbypack/ot0510_Aスタンス.vmd",
+          "priority": 2,
+          "fallback": true
+        }
+      ]
+    },
+    "Error": {
+      "candidates": [
+        {
+          "asset_id": "luotianyi_error_001",
+          "path": "assets/motions/phainon/raw/腕組みIA.モーション+/腕組みIA.モーション+/腕組みIA/腕組みIA.vmd",
+          "priority": 1,
+          "fallback": true
+        }
+      ]
+    }
+  }
+}

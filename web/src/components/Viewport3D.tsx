@@ -11,8 +11,10 @@ import type { ModelStatus } from '@/lib/api/types';
 import { useAvatarStore } from '@/lib/store/avatarStore';
 import { usePipelineStore, type PipelineStage } from '@/lib/store/pipelineStore';
 import { useSettingsStore } from '@/lib/store/settingsStore';
-import { resolveModelPmxPathById } from '@/lib/wardrobe/model-registry';
+import { getModelById, resolveModelCharacterId, resolveModelPmxPathById } from '@/lib/wardrobe/model-registry';
 import { useWardrobeStore } from '@/lib/store/wardrobeStore';
+import { getCharacterById } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 
 const DEFAULT_MANIFEST_PATH = '/api/local-files/configs/motions/phainon-motion-manifest.json';
 
@@ -22,7 +24,19 @@ const BLENDER_CAMERA_ROTATION_DEG: [number, number, number] = [89.0057, -0.00001
 const CAMERA_VERTICAL_OFFSET = 1.1;
 const CAMERA_FORWARD_OFFSET = 0.3;
 const TALK8_CAMERA_FORWARD_EXTRA_OFFSET = 0.5;
-const TALK8_MOTION_IDS = new Set(['phainon_bg_loop_chat_015', 'phainon_bg_loop_chat_016']);
+const TALK8_MOTION_IDS = new Set([
+  'phainon_bg_loop_chat_015',
+  'phainon_bg_loop_chat_016',
+  'luotianyi_speaking_001',
+  'luotianyi_speaking_002',
+]);
+
+function isTalk8LikeMotion(motionId: string): boolean {
+  if (TALK8_MOTION_IDS.has(motionId)) {
+    return true;
+  }
+  return motionId.startsWith('luotianyi_speaking_');
+}
 
 // 坐标系转换：Blender(Z-up) -> Three(Y-up)
 const BLENDER_TO_THREE_BASIS = new THREE.Quaternion().setFromEuler(
@@ -221,18 +235,20 @@ function RoomScene() {
 
 function CameraPoseController() {
   const currentMotion = useAvatarStore((state) => state.currentMotion);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const targetPositionRef = useRef(
     new THREE.Vector3(CAMERA_POSITION[0], CAMERA_POSITION[1], CAMERA_POSITION[2])
   );
 
   useEffect(() => {
-    const forwardOffset = TALK8_MOTION_IDS.has(currentMotion)
+    const isTalk8Motion = isTalk8LikeMotion(currentMotion);
+    const forwardOffset = isTalk8Motion
       ? CAMERA_FORWARD_OFFSET + TALK8_CAMERA_FORWARD_EXTRA_OFFSET
       : CAMERA_FORWARD_OFFSET;
     targetPositionRef.current
       .copy(CAMERA_BASE_POSITION)
       .addScaledVector(CAMERA_FORWARD, forwardOffset);
-  }, [currentMotion]);
+  }, [currentCharacterId, currentMotion]);
 
   useFrame(({ camera }) => {
     camera.position.copy(targetPositionRef.current);
@@ -250,11 +266,21 @@ export default function Viewport3D() {
   const setCurrentMotion = useAvatarStore((state) => state.setCurrentMotion);
   const setModelProgress = useAvatarStore((state) => state.setModelProgress);
   const currentModelId = useWardrobeStore((state) => state.currentModelId);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const setWardrobeStatus = useWardrobeStore((state) => state.setStatus);
   const setWardrobeLoadingProgress = useWardrobeStore((state) => state.setLoadingProgress);
   const setWardrobeErrorMessage = useWardrobeStore((state) => state.setErrorMessage);
 
   const activeModelPath = useMemo(() => resolveModelPmxPathById(currentModelId), [currentModelId]);
+  const modelCharacterId = useMemo(() => {
+    const model = getModelById(currentModelId);
+    return model ? resolveModelCharacterId(model) : currentCharacterId;
+  }, [currentCharacterId, currentModelId]);
+  const manifestCharacter = useMemo(
+    () => getCharacterById(modelCharacterId),
+    [modelCharacterId],
+  );
+  const manifestPath = manifestCharacter.motionManifestPath || DEFAULT_MANIFEST_PATH;
 
   useEffect(() => {
     setSceneStatus('loading');
@@ -357,9 +383,10 @@ export default function Viewport3D() {
           {shouldRenderMMD && (
             <group visible={modelStatus === 'ready'} scale={[MMD_MODEL_SCALE, MMD_MODEL_SCALE, MMD_MODEL_SCALE]}>
               <MMDCharacter
+                key={`${currentModelId}:${manifestPath}`}
                 modelId={currentModelId}
                 modelPath={activeModelPath}
-                manifestPath={DEFAULT_MANIFEST_PATH}
+                manifestPath={manifestPath}
                 onStatusChange={handleStatusChange}
                 onLoadProgress={handleProgressChange}
                 onMotionChange={setCurrentMotion}

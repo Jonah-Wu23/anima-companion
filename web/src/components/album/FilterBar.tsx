@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Filter, Camera, FolderOpen, X } from 'lucide-react';
+import { Filter, UserRound, Box, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type FilterType = 'all' | 'screenshot' | 'imported';
+export type FilterType = 'all' | 'current-character' | 'unassigned';
 
 interface FilterBarProps {
   currentFilter: FilterType;
@@ -15,8 +15,8 @@ interface FilterBarProps {
 
 const filterOptions: { value: FilterType; label: string; icon: React.ReactNode }[] = [
   { value: 'all', label: '全部', icon: <Filter className="w-3.5 h-3.5" /> },
-  { value: 'screenshot', label: '截图', icon: <Camera className="w-3.5 h-3.5" /> },
-  { value: 'imported', label: '导入', icon: <FolderOpen className="w-3.5 h-3.5" /> },
+  { value: 'current-character', label: '当前角色', icon: <UserRound className="w-3.5 h-3.5" /> },
+  { value: 'unassigned', label: '未归属', icon: <Box className="w-3.5 h-3.5" /> },
 ];
 
 export function FilterBar({ currentFilter, onFilterChange, totalCount, filteredCount }: FilterBarProps) {

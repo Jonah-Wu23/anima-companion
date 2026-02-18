@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { Send, Mic, Settings, XCircle } from 'lucide-react';
@@ -14,15 +14,14 @@ import { generateClientId } from '@/lib/utils/generate-client-id';
 import { api } from '@/lib/api/client';
 import type { Animation, ChatTextVoiceResponse, Emotion } from '@/lib/api/types';
 import { VADRecorder } from '@/lib/audio/vad-recorder';
+import { getCharacterById, getCharacterPersonaId } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 
 type WebkitWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
   __testLipSync?: (energy?: number) => number;
 };
-const DEFAULT_PERSONA_ID = process.env.NEXT_PUBLIC_DEFAULT_PERSONA_ID || 'phainon';
 const REQUIRED_TTS_PROVIDER = 'qwen_clone_tts';
-const DEFAULT_QWEN_VOICE_ID = (process.env.NEXT_PUBLIC_QWEN_VOICE_ID || '').trim();
-const DEFAULT_QWEN_TARGET_MODEL = (process.env.NEXT_PUBLIC_QWEN_TARGET_MODEL || '').trim();
 const VOICE_MODE_LABELS: Record<InputMode, string> = {
   text: '文本',
   'push-to-talk': '按键',
@@ -144,9 +143,14 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
   
   const sessionId = useSessionStore((state) => state.sessionId);
   const addMessage = useSessionStore((state) => state.addMessage);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
+  const currentCharacter = getCharacterById(currentCharacterId);
+  const personaId = getCharacterPersonaId(currentCharacterId);
+  const qwenVoiceId = currentCharacter.tts.qwenVoiceId;
+  const qwenTargetModel = currentCharacter.tts.qwenTargetModel;
   
   const {
     stage,
@@ -165,6 +169,13 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
     setAvatarEmotion(emotion);
     setAvatarAnimation(animation);
   }, [setAvatarAnimation, setAvatarEmotion]);
+  const qwenTtsPayload = useMemo(
+    () => ({
+      ...(qwenVoiceId ? { qwen_voice_id: qwenVoiceId } : {}),
+      ...(qwenTargetModel ? { qwen_target_model: qwenTargetModel } : {}),
+    }),
+    [qwenTargetModel, qwenVoiceId],
+  );
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -369,10 +380,9 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
 
       setStage('uploading');
 
-      const response = await api.chatVoice(sessionId, DEFAULT_PERSONA_ID, wavBlob, {
+      const response = await api.chatVoice(sessionId, personaId, wavBlob, {
         tts_provider: REQUIRED_TTS_PROVIDER,
-        qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
-        qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
+        ...qwenTtsPayload,
       });
 
       setStage('processing');
@@ -417,6 +427,8 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       applyAssistantState,
       ensureQwenProvider,
       playAssistantAudioBase64,
+      personaId,
+      qwenTtsPayload,
       sessionId,
       setError,
       setStage,
@@ -591,15 +603,14 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       const response = canUseVipVoice
         ? await api.chatTextWithVoice({
             session_id: sessionId,
-            persona_id: DEFAULT_PERSONA_ID,
+            persona_id: personaId,
             user_text: textToSend,
             tts_provider: REQUIRED_TTS_PROVIDER,
-            qwen_voice_id: DEFAULT_QWEN_VOICE_ID,
-            qwen_target_model: DEFAULT_QWEN_TARGET_MODEL,
+            ...qwenTtsPayload,
           })
         : await api.chatText({
             session_id: sessionId,
-            persona_id: DEFAULT_PERSONA_ID,
+            persona_id: personaId,
             user_text: textToSend
           });
 
@@ -641,7 +652,7 @@ export function InputDock({ onOpenSettings }: { onOpenSettings: () => void }) {
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64, ensureQwenProvider]);
+  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64, ensureQwenProvider, personaId, qwenTtsPayload]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

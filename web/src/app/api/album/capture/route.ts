@@ -1,4 +1,5 @@
 import { AlbumPrivacyDisabledError, saveAlbumScreenshot } from '@/lib/server/album-store';
+import type { CharacterId } from '@/lib/characters/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,17 @@ function parseInteger(raw: FormDataEntryValue | null): number | undefined {
     return undefined;
   }
   return Math.round(value);
+}
+
+function parseCharacterId(raw: FormDataEntryValue | null): CharacterId | undefined {
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const normalized = raw.trim();
+  if (normalized === 'phainon' || normalized === 'luotianyi') {
+    return normalized;
+  }
+  return undefined;
 }
 
 export async function POST(request: Request) {
@@ -39,6 +51,7 @@ export async function POST(request: Request) {
   const title = formData.get('title');
   const width = parseInteger(formData.get('width'));
   const height = parseInteger(formData.get('height'));
+  const characterId = parseCharacterId(formData.get('character_id'));
 
   try {
     const snapshot = await saveAlbumScreenshot({
@@ -48,6 +61,7 @@ export async function POST(request: Request) {
       title: typeof title === 'string' ? title : undefined,
       width,
       height,
+      characterId,
     });
     return Response.json(snapshot, { status: 201 });
   } catch (error) {

@@ -58,7 +58,7 @@ def chat_text_with_voice(
     tts_error: str | None = None
     try:
         tts_media_type, tts_audio_base64, tts_provider = synthesize_assistant_audio_base64(
-            str(result.get("assistant_raw_text", result["assistant_text"])),
+            str(result["assistant_text"]),
             force_tts_provider=req.tts_provider,
             qwen_voice_id=req.qwen_voice_id,
             qwen_target_model=req.qwen_target_model,
@@ -128,7 +128,7 @@ async def chat_voice(
     tts_error: str | None = None
     try:
         tts_media_type, tts_audio_base64, resolved_tts_provider = synthesize_assistant_audio_base64(
-            str(text_result.get("assistant_raw_text", text_result["assistant_text"])),
+            str(text_result["assistant_text"]),
             force_tts_provider=requested_tts_provider,
             qwen_voice_id=qwen_voice_id,
             qwen_target_model=qwen_target_model,

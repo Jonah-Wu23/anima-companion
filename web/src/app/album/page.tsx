@@ -10,6 +10,9 @@ import { Lightbox } from '@/components/album/Lightbox';
 import { FilterBar, type FilterType } from '@/components/album/FilterBar';
 import { EventTimeline } from '@/components/album/EventTimeline';
 import { Switch } from '@/components/ui/Switch';
+import { CharacterSwitcher } from '@/components/CharacterSwitcher';
+import { getCharacterById } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 import { cn } from '@/lib/utils';
 
 // Animation keyframes for page entrance
@@ -47,6 +50,8 @@ export default function AlbumPage() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [lightboxItem, setLightboxItem] = useState<AlbumItem | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
+  const currentCharacter = getCharacterById(currentCharacterId);
 
   // Load data
   const loadSnapshot = useCallback(async () => {
@@ -71,12 +76,19 @@ export default function AlbumPage() {
   const privacyProtectionEnabled = !privacyEnabled;
   const allItems = useMemo(() => snapshot?.items ?? [], [snapshot?.items]);
   const events = useMemo(() => snapshot?.events ?? [], [snapshot?.events]);
+  const unassignedCount = useMemo(
+    () => allItems.filter((item) => item.characterId == null).length,
+    [allItems],
+  );
 
   // Filter items
   const filteredItems = useMemo(() => {
     if (filter === 'all') return allItems;
-    return allItems.filter((item) => item.source === filter);
-  }, [allItems, filter]);
+    if (filter === 'current-character') {
+      return allItems.filter((item) => item.characterId === currentCharacterId);
+    }
+    return allItems.filter((item) => item.characterId == null);
+  }, [allItems, currentCharacterId, filter]);
 
   // Lightbox navigation
   const currentLightboxIndex = useMemo(() => {
@@ -203,6 +215,8 @@ export default function AlbumPage() {
 
               {/* Right: Actions */}
               <div className="flex flex-wrap items-center gap-3">
+                <CharacterSwitcher className="bg-white border-slate-200/80" />
+
                 {/* Refresh button */}
                 <button
                   type="button"
@@ -255,7 +269,7 @@ export default function AlbumPage() {
 
             {/* Privacy description */}
             <p className="mt-3 text-sm text-slate-500">
-              与白厄的每一个珍贵瞬间都会安全保存在这里。开启隐私保护后，新截图将不会被记录。
+              与{currentCharacter.name}的每一个珍贵瞬间都会安全保存在这里。开启隐私保护后，新截图将不会被记录。
             </p>
           </header>
 
@@ -282,13 +296,18 @@ export default function AlbumPage() {
             <section className="space-y-4 animate-fadeInUp stagger-2">
               {/* Filter bar */}
               {!isEmpty && (
-                <div className="flex items-center justify-between">
+                <div className="space-y-2">
                   <FilterBar
                     currentFilter={filter}
                     onFilterChange={setFilter}
                     totalCount={allItems.length}
                     filteredCount={filteredItems.length}
                   />
+                  {filter === 'current-character' && unassignedCount > 0 && (
+                    <p className="text-xs text-slate-500">
+                      还有 {unassignedCount} 张未归属图片（历史数据或全局截图），可切换到“未归属”查看。
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -310,7 +329,9 @@ export default function AlbumPage() {
                         没有符合条件的回忆
                       </h3>
                       <p className="text-sm text-slate-500">
-                        尝试切换其他筛选条件
+                        {filter === 'current-character'
+                          ? `${currentCharacter.name} 暂无归属回忆`
+                          : '尝试切换其他筛选条件'}
                       </p>
                       <button
                         onClick={() => setFilter('all')}
@@ -351,7 +372,7 @@ export default function AlbumPage() {
                     <div>
                       <h4 className="text-sm font-medium text-sky-900">快捷截图</h4>
                       <p className="text-xs text-sky-700/70 mt-1">
-                        在陪伴页面点击顶部相机图标，即可保存当前画面到相册。
+                        在陪伴页面点击顶部相机图标，即可保存当前画面并自动归属到当前角色。
                       </p>
                     </div>
                   </div>

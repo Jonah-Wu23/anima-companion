@@ -6,6 +6,9 @@ const REPO_ROOT = path.resolve(process.cwd(), '..');
 const ALLOWED_ROOTS = new Set(['assets', 'configs']);
 
 const CONTENT_TYPES: Record<string, string> = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
   '.pmx': 'application/octet-stream',
   '.vmd': 'application/octet-stream',
   '.yaml': 'text/yaml; charset=utf-8',

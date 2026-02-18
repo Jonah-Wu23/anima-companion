@@ -12,6 +12,7 @@ import { useAvatarStore } from '@/lib/store/avatarStore';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { TouchInteractionProvider } from '@/lib/interaction/TouchInteractionProvider';
 import { albumApi } from '@/lib/album/client';
+import { useCharacterStore } from '@/lib/store/characterStore';
 
 const Viewport3D = dynamic(
   () => import('@/components/Viewport3D').then((mod) => mod.default),
@@ -41,6 +42,7 @@ export default function Home() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureFeedback, setCaptureFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { sceneStatus } = useAvatarStore();
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const mainRef = useRef<HTMLElement | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,6 +201,7 @@ export default function Home() {
         title,
         width,
         height,
+        characterId: currentCharacterId,
       });
       setCaptureTitle(title);
       setIsCapturePromptOpen(true);
@@ -209,7 +212,7 @@ export default function Home() {
     } finally {
       setIsCapturing(false);
     }
-  }, [captureCanvasFrame, isCapturing, showCaptureFeedback]);
+  }, [captureCanvasFrame, currentCharacterId, isCapturing, showCaptureFeedback]);
 
   const isLoading = !mounted || sceneStatus === 'loading';
   const mobileViewportStyle =

@@ -1,3 +1,5 @@
+import type { CharacterId } from '@/lib/characters/types';
+
 export type AlbumItemSource = 'imported' | 'screenshot';
 
 export type AlbumEventType =
@@ -16,6 +18,7 @@ export interface AlbumItem {
   capturedAt: string;
   createdAt: string;
   updatedAt: string;
+  characterId?: CharacterId | null;
   url: string;
 }
 

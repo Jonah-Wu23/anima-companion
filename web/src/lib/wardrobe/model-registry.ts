@@ -1,6 +1,8 @@
 // Model Registry Configuration
 // Based on docs/assets/models/*.md registry files
 
+import type { CharacterId } from '@/lib/characters/types';
+
 export interface ModelInfo {
   id: string;
   name: string;
@@ -13,6 +15,7 @@ export interface ModelInfo {
   isAvailable: boolean;
   author?: string;
   priority: number;
+  characterId?: CharacterId;
 }
 
 export const AVAILABLE_MODELS: ModelInfo[] = [
@@ -198,6 +201,48 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     author: '填字小檀桌',
     priority: 14,
   },
+  {
+    id: 'model.LuoTianyi_V4',
+    name: '洛天依 V4',
+    nameEn: 'Luo Tianyi V4',
+    description: '洛天依基础形象，默认模型',
+    directory: 'assets/models/LuoTianyi_V4',
+    pmxFile: 'luotianyi_v4_ver3.3.pmx',
+    thumbnail: '/assets/luotianyi-profile.jpg',
+    tags: ['基础', '默认'],
+    isAvailable: true,
+    author: 'Nanoda，Kinsama',
+    priority: 101,
+    characterId: 'luotianyi',
+  },
+  {
+    id: 'model.LuoTianyi_LiHuaXue',
+    name: '洛天依·梨花雪',
+    nameEn: 'Luo Tianyi Li Hua Xue',
+    description: '洛天依换装：梨花雪',
+    directory: 'assets/models/LuoTianyi_LiHuaXue',
+    pmxFile: 'TDA洛天依 国风服饰 梨花雪 Ver1.02.pmx',
+    thumbnail: 'assets/model_photos/luotianyi-lihuaxue-11.png',
+    tags: ['换装', '古风'],
+    isAvailable: true,
+    author: 'Samsink(机动战士牛肉）',
+    priority: 102,
+    characterId: 'luotianyi',
+  },
+  {
+    id: 'model.LuoTianyi_MangZhong',
+    name: '洛天依·芒种',
+    nameEn: 'Luo Tianyi Mang Zhong',
+    description: '洛天依换装：芒种',
+    directory: 'assets/models/LuoTianyi_MangZhong',
+    pmxFile: 'TDA 洛天依旗袍 芒种 Ver1.00.pmx',
+    thumbnail: 'assets/model_photos/luotianyi-mangzhong-figure.png',
+    tags: ['换装', '演出'],
+    isAvailable: true,
+    author: 'Samsink(机动战士牛肉）',
+    priority: 103,
+    characterId: 'luotianyi',
+  },
 ];
 
 export const getModelById = (id: string): ModelInfo | undefined => {
@@ -214,6 +259,19 @@ export const getAvailableModels = (): ModelInfo[] => {
   );
 };
 
+export const resolveModelCharacterId = (model: ModelInfo): CharacterId => {
+  return model.characterId ?? 'phainon';
+};
+
+export const getAvailableModelsByCharacter = (characterId: CharacterId): ModelInfo[] => {
+  return getAvailableModels().filter((model) => resolveModelCharacterId(model) === characterId);
+};
+
+export const getDefaultModelByCharacter = (characterId: CharacterId): ModelInfo => {
+  const models = getAvailableModelsByCharacter(characterId);
+  return models[0] ?? getDefaultModel();
+};
+
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+/, '');
 }
@@ -225,6 +283,9 @@ function joinPath(directory: string, file: string): string {
 }
 
 function resolveLocalFilePath(filePath: string): string {
+  if (filePath.startsWith('/')) {
+    return encodeURI(filePath);
+  }
   const normalizedPath = normalizePath(filePath);
   if (normalizedPath.startsWith('assets/') || normalizedPath.startsWith('configs/')) {
     return encodeURI(`/api/local-files/${normalizedPath}`);

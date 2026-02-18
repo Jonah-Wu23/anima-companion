@@ -10,6 +10,7 @@ import {
 } from '@/lib/interaction/TouchInteractionProvider';
 import { RaycastManager, type RaycastZoneConfig } from '@/lib/interaction/RaycastManager';
 import { ExpressionDriver, type ExpressionEmotion } from '@/lib/mmd/expression-driver';
+import { ensureAmmoLoaded } from '@/lib/mmd/ammo-loader';
 import { MMDAnimationManager, type AnimationSnapshot } from '@/lib/mmd/mmd-animation';
 import { MemoryMonitor } from '@/lib/mmd/memory-monitor';
 import { disposeMMDMesh, getMMDTextureCacheStats, loadPMX, loadVMDAnimation } from '@/lib/mmd/mmd-loader';
@@ -19,16 +20,119 @@ import { MotionDriver, type MotionTouchZone } from '@/lib/mmd/motion-driver';
 import { MotionStateMachine } from '@/lib/mmd/motion-state-machine';
 import { useAvatarStore } from '@/lib/store/avatarStore';
 import { usePipelineStore, type PipelineStage } from '@/lib/store/pipelineStore';
+import { useSettingsStore } from '@/lib/store/settingsStore';
 
 const PRELOAD_STATES: MotionState[] = ['idle', 'listening', 'speaking', 'thinking', 'error'];
 const SPEAKING_RANDOM_POOL_SIZE = 2;
-const TALK8_MOTION_IDS = new Set(['phainon_bg_loop_chat_015', 'phainon_bg_loop_chat_016']);
+const TALK8_MOTION_IDS = new Set([
+  'phainon_bg_loop_chat_015',
+  'phainon_bg_loop_chat_016',
+  'luotianyi_speaking_001',
+  'luotianyi_speaking_002',
+]);
 const TALK8_INSTANT_FADE_DURATION = 0;
 const DRAG_THRESHOLD_PX = 10;
 const TOUCH_MOVE_THROTTLE_MS = 1000 / 60;
 const HIT_ZONE_SYNC_INTERVAL_MS = 1000 / 30;
 const LONG_PRESS_THRESHOLD_MS = 500;
 const HOVER_FOLLOW_HALF_RANGE = 0.16;
+const HAIR_BONE_KEYWORDS = [
+  '髪',
+  '发',
+  '髮',
+  'ヘア',
+  '前髪',
+  '後髪',
+  '横髪',
+  'hair',
+  'front hair',
+  'back hair',
+  'sidehair',
+  'twintail',
+  'ponytail',
+  'tail',
+  'braid',
+  '辫',
+  '辮',
+  'ツイン',
+  'おさげ',
+  'もみあげ',
+];
+const HAIR_SIDE_LEFT_KEYWORDS = ['左', 'left', 'l_', '_l'];
+const HAIR_SIDE_RIGHT_KEYWORDS = ['右', 'right', 'r_', '_r'];
+const HAIR_PHYSICS_MAX_BONES = 48;
+const HAIR_SWAY_BASE_ANGLE_X = 0.08;
+const HAIR_SWAY_BASE_ANGLE_Z = 0.04;
+const HAIR_SWAY_STIFFNESS_X = 18;
+const HAIR_SWAY_STIFFNESS_Z = 15;
+const HAIR_SWAY_DAMPING_X = 7;
+const HAIR_SWAY_DAMPING_Z = 6;
+const HAIR_SWAY_AMPLITUDE_MIN = 0.02;
+const HAIR_SWAY_AMPLITUDE_MAX = 0.09;
+const HAIR_DOWNWARD_BLEND = 0.88;
+const HAIR_FALLBACK_MAX_DISTANCE = 1.25;
+const HAIR_FALLBACK_Y_OFFSET = 0.45;
+const HAIR_FALLBACK_MIN_MATCH_COUNT = 6;
+const HAIR_FALLBACK_EXCLUDE_KEYWORDS = [
+  '首',
+  'neck',
+  '頭',
+  'head',
+  '目',
+  'eye',
+  '眉',
+  'jaw',
+  '舌',
+  '肩',
+  'shoulder',
+  '腕',
+  'arm',
+  'ひじ',
+  'elbow',
+  '手',
+  'hand',
+  '指',
+  'finger',
+  '上半身',
+  '下半身',
+  'body',
+  'waist',
+  '胸',
+  'breast',
+  '足',
+  'leg',
+  'knee',
+  'ankle',
+  'toe',
+  'twist',
+  'センター',
+  'center',
+  'root',
+  '全ての親',
+  'master',
+  'weapon',
+  'スカート',
+  'skirt',
+  'リボン',
+  'ribbon',
+];
+const HAIR_SWAY_STAGE_BOOST: Partial<Record<PipelineStage, number>> = {
+  idle: 0.45,
+  speaking: 1.3,
+  uploading: 0.8,
+  processing: 1.0,
+  recording: 0.75,
+  error: 0.6,
+};
+
+const hairSwayEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const hairSwayQuaternion = new THREE.Quaternion();
+const hairTempVecA = new THREE.Vector3();
+const hairTempVecB = new THREE.Vector3();
+const hairTempVecC = new THREE.Vector3();
+const hairGravityVector = new THREE.Vector3(0, -1, 0);
+const hairTempQuatA = new THREE.Quaternion();
+const hairTempQuatB = new THREE.Quaternion();
 
 type TouchGestureKind = 'click' | 'doubleClick' | 'longPress' | 'dragStart';
 
@@ -64,6 +168,18 @@ interface BoneAnchors {
   upperBody: THREE.Bone | null;
 }
 
+interface HairPhysicsBoneState {
+  bone: THREE.Bone;
+  restQuaternion: THREE.Quaternion;
+  baseQuaternion: THREE.Quaternion;
+  sideSign: -1 | 1;
+  angleX: number;
+  angleZ: number;
+  velocityX: number;
+  velocityZ: number;
+  phase: number;
+}
+
 export interface MMDCharacterProps {
   modelId?: string;
   modelPath: string;
@@ -76,6 +192,11 @@ export interface MMDCharacterProps {
   onModelLoadProgress?: (progress: number) => void;
   onModelLoadComplete?: () => void;
   onModelLoadError?: (error: Error) => void;
+}
+
+interface PendingAnimationSnapshot {
+  key: string;
+  snapshot: AnimationSnapshot;
 }
 
 function toResourcePath(url: string): string {
@@ -106,6 +227,16 @@ type MMDToonLikeMaterial = THREE.Material & {
 function isHairMaterialName(name: string): boolean {
   const normalized = name.trim();
   return normalized === '髪' || normalized === '髪2';
+}
+
+function isFrontFacingSpeakingMotion(state: MotionState, motionId: string): boolean {
+  if (state !== 'speaking') {
+    return false;
+  }
+  if (TALK8_MOTION_IDS.has(motionId)) {
+    return true;
+  }
+  return motionId.startsWith('luotianyi_speaking_');
 }
 
 function pickRandomMotion(motions: string[], previous: string | null): string {
@@ -170,6 +301,197 @@ function resolveBoneAnchors(mesh: THREE.SkinnedMesh): BoneAnchors {
     rightShoulder: findBoneByCandidates(mesh, ['右肩', 'rightshoulder', 'r_shoulder']),
     upperBody: findBoneByCandidates(mesh, ['上半身2', '上半身', 'spine', 'chest']),
   };
+}
+
+function isLuoTianyiModel(modelId: string | undefined, modelPath: string): boolean {
+  const id = String(modelId ?? '').toLowerCase();
+  const path = String(modelPath ?? '').toLowerCase();
+  return id.includes('luotianyi') || path.includes('luotianyi');
+}
+
+function resolveHairSideSign(name: string): -1 | 1 {
+  const normalized = name.toLowerCase();
+  if (HAIR_SIDE_LEFT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return -1;
+  }
+  if (HAIR_SIDE_RIGHT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return 1;
+  }
+  return 1;
+}
+
+function pickPrimaryChildBone(bone: THREE.Bone): THREE.Bone | null {
+  const children = bone.children.filter((child): child is THREE.Bone => child instanceof THREE.Bone);
+  if (children.length === 0) {
+    return null;
+  }
+  return children[0];
+}
+
+function computeHairDownwardBiasQuaternion(bone: THREE.Bone): THREE.Quaternion {
+  const childBone = pickPrimaryChildBone(bone);
+  if (!childBone || !(bone.parent instanceof THREE.Bone)) {
+    return new THREE.Quaternion();
+  }
+
+  bone.getWorldPosition(hairTempVecA);
+  childBone.getWorldPosition(hairTempVecB);
+  const fromDirWorld = hairTempVecB.sub(hairTempVecA);
+  if (fromDirWorld.lengthSq() < 1e-7) {
+    return new THREE.Quaternion();
+  }
+  fromDirWorld.normalize();
+
+  const toDirWorld = hairTempVecC.copy(fromDirWorld).lerp(hairGravityVector, HAIR_DOWNWARD_BLEND);
+  if (toDirWorld.lengthSq() < 1e-7) {
+    return new THREE.Quaternion();
+  }
+  toDirWorld.normalize();
+
+  const worldCorrection = hairTempQuatA.setFromUnitVectors(fromDirWorld, toDirWorld);
+  const parentWorldQuaternion = hairTempQuatB;
+  (bone.parent as THREE.Bone).getWorldQuaternion(parentWorldQuaternion);
+  const invParentWorldQuaternion = parentWorldQuaternion.clone().invert();
+  return invParentWorldQuaternion.multiply(worldCorrection).multiply(parentWorldQuaternion.clone()).normalize();
+}
+
+function collectHairFallbackBones(mesh: THREE.SkinnedMesh, existing: THREE.Bone[]): THREE.Bone[] {
+  const anchors = resolveBoneAnchors(mesh);
+  const headBone = anchors.head ?? anchors.neck;
+  if (!headBone) {
+    return [];
+  }
+
+  headBone.getWorldPosition(hairTempVecA);
+  const headPosition = hairTempVecA.clone();
+  const existingSet = new Set(existing);
+  const skeletonBones = mesh.skeleton?.bones ?? [];
+  const scored: Array<{ bone: THREE.Bone; score: number }> = [];
+
+  for (const bone of skeletonBones) {
+    if (existingSet.has(bone)) {
+      continue;
+    }
+    if (!(bone.parent instanceof THREE.Bone)) {
+      continue;
+    }
+    const normalized = bone.name.toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+    if (HAIR_FALLBACK_EXCLUDE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+      continue;
+    }
+    const childBone = pickPrimaryChildBone(bone);
+    if (!childBone) {
+      continue;
+    }
+
+    bone.getWorldPosition(hairTempVecB);
+    const distance = hairTempVecB.distanceTo(headPosition);
+    if (distance > HAIR_FALLBACK_MAX_DISTANCE) {
+      continue;
+    }
+    if (hairTempVecB.y < headPosition.y - HAIR_FALLBACK_Y_OFFSET) {
+      continue;
+    }
+
+    const nameBoost = normalized.includes('先') || normalized.includes('tip') ? -0.08 : 0;
+    const score = distance + nameBoost;
+    scored.push({ bone, score });
+  }
+
+  scored.sort((a, b) => a.score - b.score);
+  return scored.map((item) => item.bone);
+}
+
+function collectHairPhysicsBones(mesh: THREE.SkinnedMesh): HairPhysicsBoneState[] {
+  mesh.updateMatrixWorld(true);
+  const skeletonBones = mesh.skeleton?.bones ?? [];
+  const keywordMatched = skeletonBones
+    .filter((bone) => {
+      const normalized = bone.name.toLowerCase();
+      if (!HAIR_BONE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+        return false;
+      }
+      if (!(bone.parent instanceof THREE.Bone)) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+
+  let candidates = keywordMatched;
+  if (keywordMatched.length < HAIR_FALLBACK_MIN_MATCH_COUNT) {
+    const fallbackBones = collectHairFallbackBones(mesh, keywordMatched);
+    const merged = new Set<THREE.Bone>([...keywordMatched, ...fallbackBones]);
+    candidates = Array.from(merged);
+  }
+  candidates = candidates.slice(0, HAIR_PHYSICS_MAX_BONES);
+
+  return candidates.map((bone, index) => ({
+    // baseQuaternion 叠加“下垂偏置”，先把头发拉回重力方向，再叠加细微摆动。
+    bone,
+    restQuaternion: bone.quaternion.clone(),
+    baseQuaternion: bone.quaternion.clone().multiply(computeHairDownwardBiasQuaternion(bone)),
+    sideSign: resolveHairSideSign(bone.name),
+    angleX: 0,
+    angleZ: 0,
+    velocityX: 0,
+    velocityZ: 0,
+    phase: index * 0.37,
+  }));
+}
+
+function resetHairPhysics(states: HairPhysicsBoneState[]): void {
+  for (const state of states) {
+    state.angleX = 0;
+    state.angleZ = 0;
+    state.velocityX = 0;
+    state.velocityZ = 0;
+    state.bone.quaternion.copy(state.restQuaternion);
+  }
+}
+
+function applyHairBasePose(states: HairPhysicsBoneState[]): void {
+  for (const state of states) {
+    state.bone.quaternion.copy(state.baseQuaternion);
+  }
+}
+
+function updateHairPhysics(
+  states: HairPhysicsBoneState[],
+  params: {
+    delta: number;
+    elapsedTime: number;
+    stage: PipelineStage;
+    lipSyncEnergy: number;
+  }
+): void {
+  const { delta, elapsedTime, stage, lipSyncEnergy } = params;
+  const step = Math.min(Math.max(delta, 0), 1 / 24);
+  const stageBoost = HAIR_SWAY_STAGE_BOOST[stage] ?? HAIR_SWAY_STAGE_BOOST.idle ?? 0.45;
+  const amplitude = THREE.MathUtils.clamp(
+    HAIR_SWAY_AMPLITUDE_MIN + lipSyncEnergy * 0.1,
+    HAIR_SWAY_AMPLITUDE_MIN,
+    HAIR_SWAY_AMPLITUDE_MAX
+  );
+
+  for (const state of states) {
+    const wave =
+      Math.sin(elapsedTime * (1.45 + state.phase * 0.08) + state.phase) * amplitude * stageBoost;
+    const targetX = HAIR_SWAY_BASE_ANGLE_X + wave * 0.55;
+    const targetZ = state.sideSign * (HAIR_SWAY_BASE_ANGLE_Z + wave * 0.8);
+
+    state.velocityX += ((targetX - state.angleX) * HAIR_SWAY_STIFFNESS_X - state.velocityX * HAIR_SWAY_DAMPING_X) * step;
+    state.velocityZ += ((targetZ - state.angleZ) * HAIR_SWAY_STIFFNESS_Z - state.velocityZ * HAIR_SWAY_DAMPING_Z) * step;
+    state.angleX += state.velocityX * step;
+    state.angleZ += state.velocityZ * step;
+
+    hairSwayEuler.set(state.angleX, 0, state.angleZ, 'XYZ');
+    hairSwayQuaternion.setFromEuler(hairSwayEuler);
+    state.bone.quaternion.copy(state.baseQuaternion).multiply(hairSwayQuaternion);
+  }
 }
 
 function resolveTouchReaction(zoneId: MotionTouchZone, gesture: TouchGestureKind): TouchReaction {
@@ -411,6 +733,7 @@ export function MMDCharacter({
   const lipSyncEnergy = usePipelineStore((state) => state.lipSyncEnergy);
   const avatarEmotion = useAvatarStore((state) => state.emotion);
   const currentMotion = useAvatarStore((state) => state.currentMotion);
+  const reducedMotion = useSettingsStore((state) => state.reducedMotion);
 
   const {
     registerHitZone,
@@ -443,8 +766,10 @@ export function MMDCharacter({
   const expressionDriverRef = useRef<ExpressionDriver | null>(null);
   const motionDriverRef = useRef<MotionDriver | null>(null);
   const frameTokenRef = useRef(0);
-  const pendingAnimationSnapshotRef = useRef<AnimationSnapshot | null>(null);
+  const pendingAnimationSnapshotRef = useRef<PendingAnimationSnapshot | null>(null);
   const memoryMonitorRef = useRef<MemoryMonitor | null>(null);
+  const hairPhysicsStatesRef = useRef<HairPhysicsBoneState[]>([]);
+  const hairPhysicsEnabledRef = useRef(false);
   const zoneIdsRef = useRef<string[]>([]);
   const activePointerIdRef = useRef<number | null>(null);
   const pointerStateRef = useRef<TouchPointerState | null>(null);
@@ -453,10 +778,16 @@ export function MMDCharacter({
   const lastZoneSyncAtRef = useRef(0);
   const lastGestureHandledIdRef = useRef<string | null>(null);
   const mouseHoverZoneIdRef = useRef<string | null>(null);
+  const isLuoTianyi = isLuoTianyiModel(modelId, modelPath);
 
   useEffect(() => {
     memoryMonitorRef.current = new MemoryMonitor(gl, 'mmd-switch');
   }, [gl]);
+
+  useEffect(() => {
+    hairPhysicsEnabledRef.current = false;
+    resetHairPhysics(hairPhysicsStatesRef.current);
+  }, [isLuoTianyi, reducedMotion]);
 
   const applyTouchReaction = useCallback((zoneId: MotionTouchZone, gesture: TouchGestureKind) => {
     const reaction = resolveTouchReaction(zoneId, gesture);
@@ -526,7 +857,7 @@ export function MMDCharacter({
       const currentMesh = meshRef.current;
       let playFadeDuration = fadeDuration;
       if (currentMesh) {
-        const hasTalk8Offset = state === 'speaking' && TALK8_MOTION_IDS.has(mappedMotion);
+        const hasTalk8Offset = isFrontFacingSpeakingMotion(state, mappedMotion);
         currentMesh.rotation.y = meshBaseRotationYRef.current + (hasTalk8Offset ? -Math.PI / 2 : 0);
         if (hasTalk8Offset) {
           playFadeDuration = TALK8_INSTANT_FADE_DURATION;
@@ -568,7 +899,13 @@ export function MMDCharacter({
     let cancelled = false;
     let localMesh: THREE.SkinnedMesh | null = null;
     let localManager: MMDAnimationManager | null = null;
-    const snapshotToRestore = pendingAnimationSnapshotRef.current;
+    const animationSnapshotKey = `${manifestPath}::${modelId ?? modelPath}`;
+    const pendingSnapshot = pendingAnimationSnapshotRef.current;
+    const snapshotToRestore =
+      pendingSnapshot && pendingSnapshot.key === animationSnapshotKey ? pendingSnapshot.snapshot : null;
+    if (pendingSnapshot && pendingSnapshot.key !== animationSnapshotKey) {
+      pendingAnimationSnapshotRef.current = null;
+    }
     const memoryBefore = memoryMonitorRef.current?.capture() ?? null;
 
     if (memoryBefore) {
@@ -599,7 +936,26 @@ export function MMDCharacter({
         });
         meshRef.current = localMesh;
         meshBaseRotationYRef.current = localMesh.rotation.y;
-
+        hairPhysicsStatesRef.current = [];
+        hairPhysicsEnabledRef.current = false;
+        let enableNativeMmdPhysics = isLuoTianyi && !reducedMotion;
+        if (enableNativeMmdPhysics) {
+          emitProgress(58, '初始化物理引擎');
+          try {
+            await ensureAmmoLoaded();
+          } catch (error) {
+            enableNativeMmdPhysics = false;
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[luotianyi-hair-physics] native mmd physics disabled: ammo load failed', error);
+            }
+          }
+        }
+        if (process.env.NODE_ENV === 'development' && isLuoTianyi) {
+          console.info('[luotianyi-hair-physics] using native mmd physics', {
+            enabled: enableNativeMmdPhysics,
+            reducedMotion,
+          });
+        }
         if (cancelled) {
           disposeMMDMesh(localMesh);
           return;
@@ -652,7 +1008,10 @@ export function MMDCharacter({
         });
 
         emitProgress(60, '初始化动画控制器');
-        localManager = new MMDAnimationManager(localMesh, { fadeDuration });
+        localManager = new MMDAnimationManager(localMesh, {
+          fadeDuration,
+          usePhysics: enableNativeMmdPhysics,
+        });
         managerRef.current = localManager;
         expressionDriverRef.current = new ExpressionDriver(localMesh);
         expressionDriverRef.current.setBaseEmotion(
@@ -733,20 +1092,13 @@ export function MMDCharacter({
         motionPoolRef.current = resolvedMotionPool;
         setMesh(localMesh);
 
-        if (snapshotToRestore) {
+        const { stage: currentStage, avatarAnimation: currentAnimation } = usePipelineStore.getState();
+        if (snapshotToRestore && currentStage !== 'idle') {
           localManager.restoreSnapshot(snapshotToRestore, 0);
-          pendingAnimationSnapshotRef.current = null;
-          const restoredMotion = localManager.getCurrentActionName();
-          if (restoredMotion) {
-            setCurrentMotion(restoredMotion);
-            onMotionChange?.(restoredMotion);
-          }
         }
-
-        if (!localManager.getCurrentActionName()) {
-          const { stage: currentStage, avatarAnimation: currentAnimation } = usePipelineStore.getState();
-          applyMotion(currentStage, currentAnimation);
-        }
+        pendingAnimationSnapshotRef.current = null;
+        // 无论是否恢复快照，都以当前 pipeline 状态强制对齐动作，避免角色切换后残留旧姿态。
+        applyMotion(currentStage, currentAnimation);
 
         emitProgress(100, 'MMD 资源加载完成');
         emitStatus('ready');
@@ -799,7 +1151,10 @@ export function MMDCharacter({
       cancelled = true;
       const managerToDispose = localManager ?? managerRef.current;
       if (managerToDispose) {
-        pendingAnimationSnapshotRef.current = managerToDispose.captureSnapshot();
+        pendingAnimationSnapshotRef.current = {
+          key: animationSnapshotKey,
+          snapshot: managerToDispose.captureSnapshot(),
+        };
         if (managerRef.current === managerToDispose) {
           managerRef.current = null;
         }
@@ -811,6 +1166,9 @@ export function MMDCharacter({
       motionMapRef.current = {};
       motionPoolRef.current = {};
       activeSpeakingMotionRef.current = null;
+      resetHairPhysics(hairPhysicsStatesRef.current);
+      hairPhysicsStatesRef.current = [];
+      hairPhysicsEnabledRef.current = false;
       meshRef.current = null;
       setMesh(null);
       expressionDriverRef.current?.clear(true);
@@ -834,6 +1192,7 @@ export function MMDCharacter({
     onModelLoadError,
     onModelLoadStart,
     onMotionChange,
+    reducedMotion,
     setCurrentMotion,
   ]);
 
@@ -1194,6 +1553,14 @@ export function MMDCharacter({
     managerRef.current?.update(delta);
     expressionDriverRef.current?.update(delta);
     motionDriverRef.current?.update(delta);
+    if (hairPhysicsEnabledRef.current && hairPhysicsStatesRef.current.length > 0) {
+      updateHairPhysics(hairPhysicsStatesRef.current, {
+        delta,
+        elapsedTime: performance.now() / 1000,
+        stage,
+        lipSyncEnergy,
+      });
+    }
 
     const now = performance.now();
     if (

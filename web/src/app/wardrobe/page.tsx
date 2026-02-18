@@ -4,10 +4,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Search, X, ChevronLeft, ChevronRight, Loader2, Check, Sparkles } from 'lucide-react';
 import { selectCurrentModel, selectPreviewModel, useWardrobeStore } from '@/lib/store/wardrobeStore';
-import { AVAILABLE_MODELS, getAvailableModels } from '@/lib/wardrobe/model-registry';
+import { AVAILABLE_MODELS, getAvailableModelsByCharacter, resolveModelCharacterId } from '@/lib/wardrobe/model-registry';
 import { ModelCard } from '@/components/wardrobe/ModelCard';
 import { ModelPreview } from '@/components/wardrobe/ModelPreview';
 import { LoadingOverlay } from '@/components/wardrobe/LoadingOverlay';
+import { CharacterSwitcher } from '@/components/CharacterSwitcher';
+import { getCharacterById } from '@/lib/characters/registry';
+import { useCharacterStore } from '@/lib/store/characterStore';
 import { cn } from '@/lib/utils';
 
 // Animation keyframes
@@ -61,18 +64,9 @@ const pageStyles = `
   .stagger-4 { animation-delay: 0.2s; }
 `;
 
-// Categories derived from tags
-const CATEGORIES = [
-  { id: 'all', name: '全部', icon: Sparkles },
-  { id: '基础', name: '基础', icon: null },
-  { id: '变身', name: '变身', icon: null },
-  { id: '制服', name: '制服', icon: null },
-  { id: '女士', name: '女士', icon: null },
-  { id: '联动', name: '联动', icon: null },
-  { id: '娘化', name: '娘化', icon: null },
-];
-
 export default function WardrobePage() {
+  const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
+  const currentCharacter = getCharacterById(currentCharacterId);
   const currentModel = useWardrobeStore(selectCurrentModel);
   const previewModel = useWardrobeStore(selectPreviewModel);
   const {
@@ -96,6 +90,17 @@ export default function WardrobePage() {
   } = useWardrobeStore();
 
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const modelsForCharacter = useMemo(
+    () => getAvailableModelsByCharacter(currentCharacterId),
+    [currentCharacterId],
+  );
+  const categories = useMemo(() => {
+    const tags = Array.from(new Set(modelsForCharacter.flatMap((model) => model.tags)));
+    return [
+      { id: 'all', name: '全部', icon: Sparkles },
+      ...tags.map((tag) => ({ id: tag, name: tag, icon: null })),
+    ];
+  }, [modelsForCharacter]);
 
   useEffect(() => {
     if (status === 'switching') {
@@ -107,7 +112,7 @@ export default function WardrobePage() {
 
   // Filter models based on category and search
   const filteredModels = useMemo(() => {
-    let models = getAvailableModels();
+    let models = modelsForCharacter;
     
     // Filter by category
     if (selectedCategory && selectedCategory !== 'all') {
@@ -127,14 +132,19 @@ export default function WardrobePage() {
     }
     
     return models;
-  }, [selectedCategory, searchQuery]);
+  }, [modelsForCharacter, searchQuery, selectedCategory]);
 
   // Get recent models
   const recentModels = useMemo(() => {
     return recentModelIds
       .map((id) => AVAILABLE_MODELS.find((m) => m.id === id))
-      .filter(Boolean);
-  }, [recentModelIds]);
+      .filter((model): model is (typeof AVAILABLE_MODELS)[number] => {
+        if (!model) {
+          return false;
+        }
+        return resolveModelCharacterId(model) === currentCharacterId;
+      });
+  }, [currentCharacterId, recentModelIds]);
 
   // Handle model selection
   const handleSelectModel = useCallback((modelId: string) => {
@@ -191,6 +201,7 @@ export default function WardrobePage() {
                   <ArrowLeft className="w-4 h-4" />
                   返回陪伴页面
                 </Link>
+                <CharacterSwitcher compact showLabel={false} className="bg-white border-slate-200/80" />
               </div>
               
               <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -200,7 +211,7 @@ export default function WardrobePage() {
                 </span>
               </h1>
               <p className="text-sm text-slate-500 mt-1">
-                为白厄挑选不同的装扮
+                为{currentCharacter.name}挑选不同的装扮
               </p>
             </header>
 
@@ -240,7 +251,7 @@ export default function WardrobePage() {
             {/* Categories */}
             <div className="flex-none px-6 pb-4">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                {CATEGORIES.map((category) => (
+                {categories.map((category) => (
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id === 'all' ? null : category.id)}
