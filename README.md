@@ -1,25 +1,68 @@
-# 二次元情感陪伴助手（Web/PWA）
+# 白厄 陪伴助手
 
-一个以 Web 为主战场的二次元陪伴项目：文字聊天、语音聊天、3D 角色互动、换装、回忆相册。
+二次元情感陪伴助手（Web/PWA）：文字聊天、语音聊天、3D 角色互动、换装、回忆相册。
 
-## 1. 项目结构
-```text
-web/                Next.js 前端（主要交互都在这里）
-server/             FastAPI 后端（Auth/Chat/ASR/TTS/存储）
-configs/            人设、动作清单、提示词、环境配置
-assets/             模型/贴图/参考音频/相册图片
-data/               本地数据（如相册索引）
-docs/               架构、计划、runbook、设计文档
-scripts/            本地启动/校验脚本
+<!-- PROJECT SHIELDS -->
+
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![License][license-shield]][license-url]
+
+<!-- PROJECT LOGO -->
+<br />
+
+<p align="center">
+  <h3 align="center">白厄 陪伴助手</h3>
+  <p align="center">
+    基于《崩坏：星穹铁道》角色的同人情感陪伴应用
+    <br />
+    <a href="docs/README.md"><strong>探索项目文档 »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/Jonah-Wu23/anima-companion#功能特性">查看功能</a>
+    ·
+    <a href="https://github.com/Jonah-Wu23/anima-companion/issues">报告 Bug</a>
+    ·
+    <a href="https://github.com/Jonah-Wu23/anima-companion/issues">提出新特性</a>
+  </p>
+</p>
+
+## 目录
+
+- [上手指南](#上手指南)
+  - [开发前的配置要求](#开发前的配置要求)
+  - [安装步骤](#安装步骤)
+- [文件目录说明](#文件目录说明)
+- [页面与路由](#页面与路由)
+- [功能特性](#功能特性)
+- [使用的框架](#使用的框架)
+- [贡献者](#贡献者)
+  - [如何参与开源项目](#如何参与开源项目)
+- [版本控制](#版本控制)
+- [作者](#作者)
+- [致谢](#致谢)
+- [版权说明](#版权说明)
+
+## 上手指南
+
+### 开发前的配置要求
+
+1. Python 3.11+
+2. Node.js 18+
+3. PowerShell 7+
+
+### 安装步骤
+
+1. Clone the repo
+
+```sh
+git clone https://github.com/Jonah-Wu23/anima-companion.git
 ```
 
-## 2. 快速启动（PowerShell）
-## 2.1 前置
-- Python 3.11+
-- Node.js 18+
-- PowerShell 7+
+2. 配置环境变量
 
-## 2.2 环境变量
 ```powershell
 # 后端
 Set-Location .\server
@@ -28,26 +71,35 @@ Copy-Item .env.example .env
 # 前端
 Set-Location ..\web
 Copy-Item .env.example .env.local
-
-Set-Location ..
 ```
 
-至少要配置后端 `.env` 里的 `LLM_API_KEY`，否则对话会失败。
+3. 启动项目
 
-## 2.3 一键启动（推荐）
 ```powershell
 # 仅前后端（适合先验证文字+3D）
 python .\scripts\dev\start_full_stack.py --frontend-backend-only --web-port 3000
 
-# 全链路（含 SenseVoice + GPT-SoVITS，需本机存在默认路径）
+# 全链路（含 SenseVoice + GPT-SoVITS）
 python .\scripts\dev\start_full_stack.py --web-port 3000
 ```
 
-说明：
-- 一键脚本会把后端固定在 `18000`，并自动让前端走 `http://127.0.0.1:18000`。
-- 如果你手动启后端到 `8000`，记得把 `web/.env.local` 的 `NEXT_PUBLIC_API_BASE_URL` 改成 `http://127.0.0.1:8000`。
+## 文件目录说明
 
-## 3. 页面与路由
+```text
+filetree
+├── LICENSE
+├── README.md
+├── web/                    Next.js 前端（主要交互）
+├── server/                 FastAPI 后端（Auth/Chat/ASR/TTS/存储）
+├── configs/                人设、动作清单、提示词、环境配置
+├── assets/                 模型/贴图/参考音频/相册图片
+├── data/                   本地数据（如相册索引）
+├── docs/                   架构、计划、runbook、设计文档
+└── scripts/                本地启动/校验脚本
+```
+
+## 页面与路由
+
 - 首页：`/`
 - 登录：`/login`
 - 注册：`/register`
@@ -56,228 +108,115 @@ python .\scripts\dev\start_full_stack.py --web-port 3000
 - 回忆相册：`/album`
 - 打赏/启用 VIP：`/sponsor`
 
-## 4. Chat 页面详细教程
-## 4.1 顶部按钮（从左到右）
-1. `主页`（Home 图标）
-   返回 `/` 首页。
-2. `截图`（相机图标）
-   把当前 3D 画布截图并尝试保存到相册。
-3. `换装`（Sparkles 图标）
-   进入 `/wardrobe` 换装间。
-4. `相册`（Images 图标）
-   进入 `/album` 回忆相册。
-5. `设置`（齿轮图标）
-   打开底部设置抽屉（VIP、自动播放、减弱动画、清理数据）。
+## 功能特性
 
-## 4.2 聊天区
-- 中间是消息面板，支持用户/角色气泡消息和“正在思考”状态。
-- 首次进入无消息时，会显示 3 个快捷开场按钮，可直接触发一轮文字对话。
+![首页预览](assets/readme_photos/01.png)
 
-## 4.3 输入区的 3 种模式（你问的“语音输入三个切换”）
-模式开关在输入栏上方，分别是：
+### 聊天系统
 
-1. `文本`
-   - 含义：纯文字输入。
-   - 用法：输入内容，点发送或回车。
-   - 是否需要 VIP：不需要。
+![Chat 聊天界面](assets/readme_photos/02.png)
 
-2. `按键`（push-to-talk）
-   - 含义：按住/点按麦克风录音，松开后发送。
-   - 用法：
-     - 按住说话，松开结束并发送。
-     - 也支持“轻点开始，再点结束”（有最短释放保护，防误触）。
-     - 录音时上滑可取消（显示“松开手指取消发送”）。
-   - 规则：
-     - 录音太短（<500ms）会被丢弃。
-   - 是否需要 VIP：需要；未启用会弹窗引导去 `/sponsor`。
+- 文字聊天：基础对话功能
+- 按键语音：按住/点按麦克风录音（VIP）
+- VAD 语音：自动语音活动检测（VIP）
 
-3. `VAD`
-   - 含义：自动语音活动检测，直接说话，不用按住。
-   - 用法：
-     - 切到 VAD 后直接说话，系统自动检测起止并提交。
-   - 状态：
-     - 待机中 / 倾听中 / 聆听中 / 处理中（状态条会实时变化）。
-   - 是否需要 VIP：需要；未启用会引导去 `/sponsor`。
+### 3D 角色互动
+- 触摸反馈：单击、双击、长按、拖拽
+- 命中区域：头部、面部、眼睛、手部、肩膀、身体
+- 注视跟随：桌面端鼠标悬停响应
 
-## 4.4 VIP 与语音能力关系
-- 语音输入（按键/VAD）需要 VIP 开关打开。
-- 文字对话永远可用。
-- “自动播放语音”打开后，文本回复会尝试走 TTS；未启用 VIP 会弹引导窗。
-- Sponsor 页文案是“打赏自愿”，点“我已打赏，启用VIP”即可返回并启用。
+### 换装系统
 
-## 5. 从 Chat 到换装页（详细步骤）
-1. 在 `/chat` 顶部点击 `✨` 换装按钮。
-2. 进入 `/wardrobe` 后，左侧是模型列表，右侧是大预览。
-3. 点击任意卡片后进入“预览态”（不是立即生效）。
-4. 点击 `确认更换` 才会切换当前模型。
-5. 点击 `取消` 放弃本次预览。
-6. 顶部 `返回陪伴页面` 返回 `/chat`。
+![换装间](assets/readme_photos/09.png)
 
-补充：
-- 支持搜索、分类筛选、最近使用。
-- 当前内置多套白厄模型（基础、变身、制服、女士、联动等标签）。
+- 多套白厄模型（基础、变身、制服、女士、联动等）
+- 搜索、分类筛选、最近使用
+- 预览确认机制
 
-## 6. 从 Chat 到相册页 + 截图全流程
-## 6.1 进入相册
-有两条路：
-1. Chat 顶部点击 `相册` 图标，直接进入 `/album`。
-2. 先在 Chat 点 `截图`，保存成功后弹窗里点“前往回忆相册”。
+### 回忆相册
 
-## 6.2 截图按钮到底截什么
-- 截的是 `main canvas`（3D 画布），不是整页 UI。
-- 成功后会出现顶部提示“截图已写入回忆相册”。
-- 同时会弹出“截图已加入回忆相册”的确认弹窗。
+![回忆相册](assets/readme_photos/11.png)
 
-## 6.3 截图保存到哪里
-- 图片文件：`assets/photos/`
-- 相册索引与事件：`data/album/store.json`
-- 相册读取 URL 由本地路由 `/api/local-files/assets/photos/...` 提供。
+- 截图保存：3D 画布截图入库
+- 隐私保护：可选开启，防止新截图入库
+- Lightbox 查看、下载、删除
 
-## 6.4 为什么有时截图失败
-最常见原因是相册里开启了“隐私保护”：
-- 相册页右上角开关显示“隐私保护开启”时，新截图不会入库。
-- 这时在 Chat 点截图会收到失败提示（后端拒绝写入）。
+### 设置
+- VIP 模式：开启语音输入和完整语音链路
+- 自动播放语音：收到回复后自动朗读
+- 减弱动画：降低动效和 3D 动态强度
+- 清除数据：清空前端会话状态
 
-## 6.5 相册页可做什么
-- 筛选：全部 / 截图 / 导入
-- 查看：点卡片打开 Lightbox
-- Lightbox 支持：上一张/下一张、下载、删除
-- 事件时间线：最近 10 条操作（截图、导入、删除、隐私切换）
+## 使用的框架
 
-## 7. 角色触摸互动（支持什么、怎么互动）
-## 7.1 支持的交互
-- 单击
-- 双击
-- 长按
-- 拖拽（仅部分区域）
-- 悬停（桌面鼠标）
+- [Next.js](https://nextjs.org)
+- [React](https://reactjs.org)
+- [FastAPI](https://fastapi.tiangolo.com)
+- [Three.js](https://threejs.org)
+- [Tailwind CSS](https://tailwindcss.com)
 
-## 7.2 命中区域与优先级
-优先级从高到低：
-`head(10) > face(9) > eyes(8) > left/right hand(7) > shoulders(6) > body(5)`
+## 贡献者
 
-## 7.3 每个区域支持动作
-- `head`：单击/双击/长按/拖拽/悬停
-- `face`：单击/双击/长按/悬停
-- `eyes`：悬停/单击
-- `leftHand/rightHand`：单击/双击/悬停（不支持拖拽）
-- `shoulders`：单击/双击/拖拽/悬停
-- `body`：单击/双击/拖拽/悬停
+欢迎所有形式的贡献！
 
-## 7.4 手势判定阈值（关键）
-- 双击窗口：500ms 内、同一区域、位移足够近
-- 长按阈值：500ms
-- 拖拽启动：移动超过 10px
-- 区域冷却：约 200ms（防止连点爆触发）
+### 如何参与开源项目
 
-## 7.5 实操建议
-1. 想看“注视跟随”：桌面端把鼠标在头/脸附近慢慢移动。
-2. 想看“惊讶反馈”：同一区域快速双击。
-3. 想看“抚摸感”：在头部长按后轻拖。
-4. 想看“身体响应”：从身体或肩部开始拖拽。
-5. 手部目前只建议点按，不要期待拖拽动作。
+贡献使开源社区成为一个学习、激励和创造的绝佳场所。任何贡献都非常感谢！
 
-## 8. 设置页说明
-- `VIP 模式`：开启后可用语音输入和完整语音链路。
-- `自动播放语音`：收到回复后自动朗读（需 VIP 才能真正走语音）。
-- `减弱动画`：降低动效和 3D 动态强度。
-- `立即清除数据`：清空当前前端会话状态并重置会话。
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 9. 常用排查
-1. 文字能聊，语音不能用
-   - 先确认 VIP 是否开启。
-   - 再确认麦克风权限、ASR/TTS 服务是否启动。
-2. 前端请求后端失败
-   - 检查 `NEXT_PUBLIC_API_BASE_URL` 是否和后端端口一致。
-3. 截图按钮点了但相册没新增
-   - 去 `/album` 看“隐私保护”是否开启。
-4. 触摸反馈不明显
-   - 先等模型加载完成。
-   - 尽量命中头部/脸部区域，反馈更明显。
+## 版本控制
 
-## 10. 功能截图
-以下截图位于 `assets/readme_photos/`，可直接用于发布展示。
+该项目使用 Git 进行版本管理。您可以在 repository 参看当前可用版本。
 
-### 10.1 首页与 Chat
-1. 首页首屏
-![首页首屏](assets/readme_photos/01.png)
+## 作者
 
-2. Chat 全局布局（3D 区 + 消息区 + 输入区）
-![Chat 全局布局](assets/readme_photos/02.png)
+Jonah Wu (3582584159@qq.com)
 
-3. Chat 顶栏五个按钮
-![Chat 顶栏按钮](assets/readme_photos/03.png)
+*您也可以在贡献者名单中参看所有参与该项目的开发者。*
 
-4. 文本/按键/VAD 三模式切换区
-![输入模式切换](assets/readme_photos/04.png)
+## 致谢
 
-5. 按键录音中（波形 + 提示文案）
-![按键录音状态](assets/readme_photos/05.png)
+### 素材致谢
 
-6. VAD 待机/倾听状态
-![VAD 状态](assets/readme_photos/06.png)
+- **模型作者**：流云景、FixEll、苏酥鱼鱼喵、随着2时间的推移、林槿、填字小檀桌
+- **动作提供方**：ot0510_standbypack、背景キャラ用ループ会話モーション、土下座のモーション、腕組みIA.モーション+、ミニモーション集
 
-7. 截图成功提示 + 相册弹窗（合并图）
-![截图成功与相册弹窗](assets/readme_photos/07.png)
+### 技术致谢
 
-### 10.2 换装与相册
-8. 换装页全貌 + 确认更换/取消（合并图）
-![换装页与确认按钮](assets/readme_photos/09.png)
+- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
+- [Three.js](https://threejs.org)
+- [PMX Editor](https://seiga.nicovideo.jp/)
 
-9. 相册页全貌（筛选 + 网格 + 事件时间线）
-![相册页全貌](assets/readme_photos/11.png)
+## 版权说明
 
-10. 隐私保护开关
-![隐私保护开关](assets/readme_photos/12.png)
+### 版权声明
 
-11. Lightbox 大图查看
-![Lightbox 大图查看](assets/readme_photos/13.png)
+本项目（白厄 陪伴助手 / Phainon Companion）为《崩坏：星穹铁道》同人衍生作品，严格遵循 **[《崩坏：星穹铁道》同人衍生作品创作指引 V3.0](https://www.bilibili.com/opus/1089707102255972370)** 进行创作。
 
-### 10.3 设置与互动
-12. 设置抽屉（VIP、自动播放、减弱动画、清理数据）
-![设置抽屉](assets/readme_photos/14.png)
+- **版权归属**：角色"白厄"、世界观、游戏原文文本、美术素材、音频素材等内容的知识产权均归 **上海米哈游海渊城科技有限公司** 及 **HoYoverse** 所有。
+- **项目性质**：本项目为粉丝个人开发，**非米哈游官方应用**。
+- **严禁商用**：本项目源代码及服务仅供学习交流，**严禁任何形式的商业盈利行为**。
 
-13. 角色触摸互动示意
-![角色触摸互动](assets/readme_photos/15.png)
+### 免责声明
 
-14. 打赏页 + 启用 VIP
-![打赏页与启用VIP](assets/readme_photos/16.png)
-
-## 11. License
-This project is licensed under the Apache License, Version 2.0 (January 2004).
-See `License` for the full text.
-- http://www.apache.org/licenses/
-
-## 12. 致谢与免责声明 (Acknowledgements & Disclaimer)
-
-### 12.1 版权声明
-本项目（白厄 陪伴助手 / Phainon Companion）为《崩坏：星穹铁道》同人衍生作品，严格遵循 **[《崩坏：星穹铁道》同人衍生作品创作指引 V3.0](https://www.bilibili.com/opus/1089707102255972370?spm_id_from=333.1391.0.0)**（2025年7月15日生效）进行创作。
-
-- **版权归属**：本项目中涉及的角色“白厄”（Phainon）、世界观、游戏原文文本、美术素材、音频素材等内容的知识产权均归 **上海米哈游海渊城科技有限公司** 及 **HoYoverse** 所有。
-- **法定声明**：《崩坏：星穹铁道》素材的权利归米哈游所有，其他内容的相关权利、利益均归各自所有者享有。
-
-### 12.2 特别声明：AI 语音与声音样本
-本项目使用的 TTS（语音合成）技术仅用于**计算机语音技术研究与非商业性质的个人同好交流**。
-- **声音样本**：模型训练所用声音样本来源于游戏公开语音。
-- **权利响应**：根据指引 V3.0 第三条 Q1 之规定，若配音演员或米哈游认为本项目侵犯了其声音权益，请通过邮件（3582584159@qq.com）联系开发者，我们将无条件、立即移除相关语音模型及功能。
-- **禁止滥用**：严禁用户利用本项目的语音合成功能生成违反法律法规、违背社会公德或侵害配音演员名誉的内容。
-
-### 12.3 项目性质
-1. **非官方性质**：本项目为粉丝个人开发，**非米哈游官方应用**。
-2. **严禁商用**：本项目源代码及服务仅供学习交流。根据指引 V3.0 规定，本项目**严禁任何形式的商业盈利行为**。项目中的“打赏/Sponsor”功能仅为用户自愿分摊高昂的 GPU 服务器租赁与 LLM API 成本，并非向用户出售软件、语音包或任何数字商品。
-
-### 12.4 素材使用规范
-- **AI 模型**：项目中使用的语音模型（GPT-SoVITS）与语言模型（LLM）均基于开源技术构建。语音合成仅用于角色扮演体验，严禁生成违反法律法规、社会公德或侵害他人权益的内容。
-- **图像/模型**：项目中使用的 3D 模型及相关图片资源，若非官方提取物，均已获得原作者授权或遵循其开源协议；若为官方素材提取，仅用于非商业展示。
-
-### 12.5 免责条款
-用户在使用本项目时，请自觉遵守当地法律法规及《崩坏：星穹铁道》用户协议。因用户个人违规使用（如生成不当内容、进行商业倒卖等）而产生的任何法律责任，由用户自行承担，与项目开发者及米哈游无关。若本项目侵犯了您的合法权益，请联系开发者进行删除或整改。
-
-### 12.6 素材致谢
-- **模型作者致谢**：感谢以下模型作者/改模作者对同人生态的贡献（按当前工程登记）：`流云景`、`FixEll`、`苏酥鱼鱼喵`、`随着2时间的推移`、`林槿`、`填字小檀桌`。
-- **动作提供方致谢**：感谢动作素材提供方与配布者（按当前动作登记包名）：`ot0510_standbypack`、`背景キャラ用ループ会話モーション`、`土下座のモーション`、`腕組みIA.モーション+`、`ミニモーション集`。
-- 以上致谢信息以仓库内资产登记文档为准：`docs/assets/models/README.md`、`docs/assets/mmd-motion-registry.md`。
-
----
+因用户个人违规使用（如生成不当内容、进行商业倒卖等）而产生的任何法律责任，由用户自行承担，与项目开发者及米哈游无关。若本项目侵犯了您的合法权益，请联系开发者进行删除或整改。
 
 *This project is a fan-made work based on "Honkai: Star Rail". All rights regarding the character Phainon and game assets belong to miHoYo/HoYoverse.*
+
+<!-- links -->
+[contributors-shield]: https://img.shields.io/github/contributors/Jonah-Wu23/anima-companion.svg?style=flat-square
+[contributors-url]: https://github.com/Jonah-Wu23/anima-companion/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/Jonah-Wu23/anima-companion.svg?style=flat-square
+[forks-url]: https://github.com/Jonah-Wu23/anima-companion/network/members
+[stars-shield]: https://img.shields.io/github/stars/Jonah-Wu23/anima-companion.svg?style=flat-square
+[stars-url]: https://github.com/Jonah-Wu23/anima-companion/stargazers
+[issues-shield]: https://img.shields.io/github/issues/Jonah-Wu23/anima-companion.svg?style=flat-square
+[issues-url]: https://github.com/Jonah-Wu23/anima-companion/issues
+[license-shield]: https://img.shields.io/github/license/Jonah-Wu23/anima-companion.svg?style=flat-square
+[license-url]: https://github.com/Jonah-Wu23/anima-companion/blob/master/LICENSE
+
