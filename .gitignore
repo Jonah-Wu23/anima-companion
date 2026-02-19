@@ -84,3 +84,6 @@ assets/motions/phainon/raw/
 # test
 testsprite_tests/
 server/.data/companion.db
+
+# release
+release/
