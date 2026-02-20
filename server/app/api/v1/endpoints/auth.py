@@ -12,9 +12,15 @@ from app.core.settings import Settings, get_settings
 from app.dependencies import get_auth_store, get_captcha_verifier, get_sms_auth_service
 from app.repositories.auth_store import AuthStore, AuthUser, SmsChallenge
 from app.schemas.auth import (
+    AuthBindEmailRequest,
+    AuthBindPhoneRequest,
+    AuthIdentitiesMeResponse,
+    AuthIdentityBindingResponse,
+    AuthLoginEmailRequest,
     AuthLoginPasswordRequest,
     AuthLoginSmsRequest,
     AuthLogoutResponse,
+    AuthRegisterEmailRequest,
     AuthRegisterRequest,
     AuthSessionResponse,
     AuthSmsSendRequest,
@@ -142,6 +148,22 @@ def _verify_sms_code_or_raise(
     store.consume_sms_challenge(challenge_id=challenge.challenge_id)
 
 
+def _require_current_user(
+    *,
+    request: Request,
+    store: AuthStore,
+    settings: Settings,
+) -> AuthUser:
+    session_token = request.cookies.get(settings.auth_cookie_name, "")
+    if not session_token:
+        raise HTTPException(status_code=401, detail="未登录")
+    resolved = store.get_user_by_session(session_token)
+    if resolved is None:
+        raise HTTPException(status_code=401, detail="未登录")
+    user, _ = resolved
+    return user
+
+
 @router.post("/sms/send", response_model=AuthSmsSendResponse)
 def send_sms(
     req: AuthSmsSendRequest,
@@ -218,6 +240,36 @@ def register(
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 
+@router.post("/register/email", response_model=AuthSessionResponse)
+def register_email(
+    req: AuthRegisterEmailRequest,
+    response: Response,
+    store: AuthStore = Depends(get_auth_store),
+    captcha_verifier: CaptchaVerifier = Depends(get_captcha_verifier),
+    settings: Settings = Depends(get_settings),
+) -> AuthSessionResponse:
+    _verify_captcha(
+        captcha_verifier=captcha_verifier,
+        captcha_verify_param=req.captcha_verify_param,
+        scene="register",
+    )
+    normalized_email = store.normalize_email(str(req.email))
+    existing_user = store.get_user_by_email(normalized_email)
+    if existing_user is not None:
+        raise HTTPException(status_code=409, detail="邮箱已存在")
+
+    try:
+        user = store.register_user_with_email(email=normalized_email, password=req.password)
+    except ValueError as exc:
+        if str(exc) == "email_exists":
+            raise HTTPException(status_code=409, detail="邮箱已存在") from exc
+        raise HTTPException(status_code=400, detail="注册失败") from exc
+
+    session = store.create_session(user.id)
+    _set_auth_cookie(response, session.token, settings)
+    return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
+
+
 @router.post("/login/password", response_model=AuthSessionResponse)
 def login_password(
     req: AuthLoginPasswordRequest,
@@ -236,6 +288,29 @@ def login_password(
     if len(normalized_phone) >= 11:
         account = normalized_phone
     user = store.authenticate_user(account=account, password=req.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="账号或密码错误")
+
+    session = store.create_session(user.id)
+    _set_auth_cookie(response, session.token, settings)
+    return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
+
+
+@router.post("/login/email", response_model=AuthSessionResponse)
+def login_email(
+    req: AuthLoginEmailRequest,
+    response: Response,
+    store: AuthStore = Depends(get_auth_store),
+    captcha_verifier: CaptchaVerifier = Depends(get_captcha_verifier),
+    settings: Settings = Depends(get_settings),
+) -> AuthSessionResponse:
+    _verify_captcha(
+        captcha_verifier=captcha_verifier,
+        captcha_verify_param=req.captcha_verify_param,
+        scene="login",
+    )
+    normalized_email = store.normalize_email(str(req.email))
+    user = store.authenticate_user_by_email(email=normalized_email, password=req.password)
     if user is None:
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
@@ -270,12 +345,84 @@ def login_sms(
         sms_code=req.sms_code,
     )
 
-    user = store.get_user_by_account(normalized_phone)
+    user = store.get_user_by_phone(normalized_phone)
+    if user is None:
+        # Backward compatibility fallback: old data may still treat phone as account.
+        user = store.get_user_by_account(normalized_phone)
     if user is None:
         raise HTTPException(status_code=401, detail="账号或验证码错误")
     session = store.create_session(user.id)
     _set_auth_cookie(response, session.token, settings)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
+
+
+@router.post("/bind/phone", response_model=AuthUserResponse)
+def bind_phone(
+    req: AuthBindPhoneRequest,
+    request: Request,
+    store: AuthStore = Depends(get_auth_store),
+    captcha_verifier: CaptchaVerifier = Depends(get_captcha_verifier),
+    sms_service: SmsAuthService = Depends(get_sms_auth_service),
+    settings: Settings = Depends(get_settings),
+) -> AuthUserResponse:
+    user = _require_current_user(request=request, store=store, settings=settings)
+    normalized_phone = _normalize_phone(req.phone)
+    if len(normalized_phone) < 11:
+        raise HTTPException(status_code=400, detail="手机号格式不正确")
+    _verify_captcha(
+        captcha_verifier=captcha_verifier,
+        captcha_verify_param=req.captcha_verify_param,
+        scene="login",
+    )
+    _verify_sms_code_or_raise(
+        store=store,
+        sms_service=sms_service,
+        challenge_id=req.sms_challenge_id,
+        phone=normalized_phone,
+        scene="login",
+        sms_code=req.sms_code,
+    )
+    try:
+        store.bind_phone_to_user(user_id=user.id, phone=normalized_phone, is_verified=True)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "identity_exists":
+            raise HTTPException(status_code=409, detail="手机号已被其他账号绑定") from exc
+        if code == "phone_already_bound":
+            raise HTTPException(status_code=409, detail="当前账号已绑定其他手机号") from exc
+        if code == "invalid_phone":
+            raise HTTPException(status_code=400, detail="手机号格式不正确") from exc
+        raise HTTPException(status_code=400, detail="绑定失败") from exc
+    return _to_user_response(user)
+
+
+@router.post("/bind/email", response_model=AuthUserResponse)
+def bind_email(
+    req: AuthBindEmailRequest,
+    request: Request,
+    store: AuthStore = Depends(get_auth_store),
+    captcha_verifier: CaptchaVerifier = Depends(get_captcha_verifier),
+    settings: Settings = Depends(get_settings),
+) -> AuthUserResponse:
+    user = _require_current_user(request=request, store=store, settings=settings)
+    _verify_captcha(
+        captcha_verifier=captcha_verifier,
+        captcha_verify_param=req.captcha_verify_param,
+        scene="login",
+    )
+    normalized_email = store.normalize_email(str(req.email))
+    try:
+        store.bind_email_to_user(user_id=user.id, email=normalized_email, is_verified=True)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "identity_exists":
+            raise HTTPException(status_code=409, detail="邮箱已被其他账号绑定") from exc
+        if code == "email_already_bound":
+            raise HTTPException(status_code=409, detail="当前账号已绑定其他邮箱") from exc
+        if code == "invalid_email":
+            raise HTTPException(status_code=400, detail="邮箱格式不正确") from exc
+        raise HTTPException(status_code=400, detail="绑定失败") from exc
+    return _to_user_response(user)
 
 
 @router.post("/logout", response_model=AuthLogoutResponse)
@@ -308,6 +455,28 @@ def me(
 
     user, expires_at = resolved
     return AuthSessionResponse(user=_to_user_response(user), expires_at=expires_at)
+
+
+@router.get("/identities/me", response_model=AuthIdentitiesMeResponse)
+def identities_me(
+    request: Request,
+    store: AuthStore = Depends(get_auth_store),
+    settings: Settings = Depends(get_settings),
+) -> AuthIdentitiesMeResponse:
+    user = _require_current_user(request=request, store=store, settings=settings)
+    identities = store.get_user_identities(user.id)
+    phone = identities.get(AuthStore.IDENTITY_PHONE, {})
+    email = identities.get(AuthStore.IDENTITY_EMAIL, {})
+    return AuthIdentitiesMeResponse(
+        phone=AuthIdentityBindingResponse(
+            value=phone.get("value"),
+            is_verified=bool(phone.get("is_verified", False)),
+        ),
+        email=AuthIdentityBindingResponse(
+            value=email.get("value"),
+            is_verified=bool(email.get("is_verified", False)),
+        ),
+    )
 
 
 def _mask_phone(phone: str) -> str:

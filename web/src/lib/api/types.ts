@@ -137,3 +137,37 @@ export interface AuthSessionResponse {
 export interface AuthLogoutResponse {
   ok: boolean;
 }
+
+export interface AuthRegisterEmailRequest {
+  email: string;
+  password: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthLoginEmailRequest {
+  email: string;
+  password: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthBindEmailRequest {
+  email: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthBindPhoneRequest {
+  phone: string;
+  sms_challenge_id: string;
+  sms_code: string;
+  captcha_verify_param: string;
+}
+
+export interface AuthIdentityBindingResponse {
+  value: string | null;
+  is_verified: boolean;
+}
+
+export interface AuthIdentitiesMeResponse {
+  phone: AuthIdentityBindingResponse;
+  email: AuthIdentityBindingResponse;
+}

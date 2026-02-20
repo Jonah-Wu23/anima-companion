@@ -4,6 +4,12 @@ import {
   AuthLoginSmsRequest,
   AuthLogoutResponse,
   AuthRegisterRequest,
+  AuthRegisterEmailRequest,
+  AuthLoginEmailRequest,
+  AuthBindEmailRequest,
+  AuthBindPhoneRequest,
+  AuthUser,
+  AuthIdentitiesMeResponse,
   AuthSmsSendRequest,
   AuthSmsSendResponse,
   AuthSessionResponse,
@@ -54,6 +60,16 @@ export const api = {
     return data;
   },
 
+  registerWithEmail: async (payload: AuthRegisterEmailRequest): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.post<AuthSessionResponse>('/v1/auth/register/email', payload);
+    return data;
+  },
+
+  loginWithEmail: async (payload: AuthLoginEmailRequest): Promise<AuthSessionResponse> => {
+    const { data } = await apiClient.post<AuthSessionResponse>('/v1/auth/login/email', payload);
+    return data;
+  },
+
   logout: async (): Promise<AuthLogoutResponse> => {
     const { data } = await apiClient.post<AuthLogoutResponse>('/v1/auth/logout');
     return data;
@@ -61,6 +77,21 @@ export const api = {
 
   me: async (): Promise<AuthSessionResponse> => {
     const { data } = await apiClient.get<AuthSessionResponse>('/v1/auth/me');
+    return data;
+  },
+
+  bindEmail: async (payload: AuthBindEmailRequest): Promise<AuthUser> => {
+    const { data } = await apiClient.post<AuthUser>('/v1/auth/bind/email', payload);
+    return data;
+  },
+
+  bindPhone: async (payload: AuthBindPhoneRequest): Promise<AuthUser> => {
+    const { data } = await apiClient.post<AuthUser>('/v1/auth/bind/phone', payload);
+    return data;
+  },
+
+  getIdentitiesMe: async (): Promise<AuthIdentitiesMeResponse> => {
+    const { data } = await apiClient.get<AuthIdentitiesMeResponse>('/v1/auth/identities/me');
     return data;
   },
 

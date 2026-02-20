@@ -4,14 +4,25 @@ import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, UserPlus, Smartphone, KeyRound, Lock, ChevronRight, AlertCircle } from "lucide-react";
+import { Sparkles, UserPlus, Smartphone, KeyRound, Lock, Mail, ChevronRight, AlertCircle } from "lucide-react";
 
 import { verifyAliyunCaptcha } from "@/lib/auth/aliyun-captcha";
 import { api } from "@/lib/api/client";
 import { useLegalDocumentModal } from "@/components/legal/use-legal-document-modal";
 
+type RegisterTab = "phone" | "email";
+
 function normalizePhone(input: string): string {
   return input.replace(/[^0-9]/g, "");
+}
+
+function normalizeEmail(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
 }
 
 function getPasswordScore(password: string): number {
@@ -34,11 +45,23 @@ export default function RegisterPage() {
   const router = useRouter();
   const { legalDocs, openLegalDocument, legalDocumentModal } = useLegalDocumentModal();
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<RegisterTab>("phone");
+  
+  // Phone registration state
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [smsChallengeId, setSmsChallengeId] = useState("");
   const [smsCountdown, setSmsCountdown] = useState(0);
   const [password, setPassword] = useState("");
+  
+  // Email registration state
+  const [email, setEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // Common state
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sendingSms, setSendingSms] = useState(false);
@@ -65,11 +88,14 @@ export default function RegisterPage() {
   }, [smsCountdown]);
 
   const normalizedPhone = normalizePhone(phone);
+  const normalizedEmail = normalizeEmail(email);
   const canSendSms = normalizedPhone.length >= 11 && smsCountdown <= 0 && !sendingSms;
-  const passwordScore = getPasswordScore(password);
+  
+  const passwordScore = getPasswordScore(activeTab === "phone" ? password : emailPassword);
   const strengthLabel = getPasswordStrengthLabel(passwordScore);
 
-  const canSubmit = useMemo(
+  // Phone registration validation
+  const canSubmitPhone = useMemo(
     () =>
       !submitting &&
       !redirecting &&
@@ -80,6 +106,20 @@ export default function RegisterPage() {
       password.length >= 6,
     [agreed, normalizedPhone.length, password.length, redirecting, smsChallengeId.length, smsCode, submitting]
   );
+
+  // Email registration validation
+  const canSubmitEmail = useMemo(
+    () =>
+      !submitting &&
+      !redirecting &&
+      agreed &&
+      isValidEmail(normalizedEmail) &&
+      emailPassword.length >= 6 &&
+      emailPassword === confirmPassword,
+    [agreed, confirmPassword, emailPassword, normalizedEmail, redirecting, submitting]
+  );
+
+  const canSubmit = activeTab === "phone" ? canSubmitPhone : canSubmitEmail;
 
   const resolveCommonError = (err: unknown): string => {
     if (axios.isAxiosError(err)) {
@@ -123,6 +163,24 @@ export default function RegisterPage() {
     }
   };
 
+  const handlePhoneSubmit = async (captchaVerifyParam: string) => {
+    await api.register({
+      phone: normalizedPhone,
+      sms_challenge_id: smsChallengeId,
+      sms_code: smsCode.trim(),
+      password,
+      captcha_verify_param: captchaVerifyParam,
+    });
+  };
+
+  const handleEmailSubmit = async (captchaVerifyParam: string) => {
+    await api.registerWithEmail({
+      email: normalizedEmail,
+      password: emailPassword,
+      captcha_verify_param: captchaVerifyParam,
+    });
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitLockRef.current || !canSubmit) {
@@ -134,13 +192,11 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       const captchaVerifyParam = await verifyAliyunCaptcha("register");
-      await api.register({
-        phone: normalizedPhone,
-        sms_challenge_id: smsChallengeId,
-        sms_code: smsCode.trim(),
-        password,
-        captcha_verify_param: captchaVerifyParam,
-      });
+      if (activeTab === "phone") {
+        await handlePhoneSubmit(captchaVerifyParam);
+      } else {
+        await handleEmailSubmit(captchaVerifyParam);
+      }
       succeeded = true;
       setRedirecting(true);
       router.replace("/chat");
@@ -153,6 +209,8 @@ export default function RegisterPage() {
       }
     }
   };
+
+  const isPhoneMode = activeTab === "phone";
 
   return (
     <main className="relative min-h-screen bg-[#F8FAFC] overflow-x-hidden">
@@ -192,71 +250,152 @@ export default function RegisterPage() {
               <p className="mt-2 text-sm text-[#64748B]">开启与白厄的专属陪伴</p>
             </header>
 
-            <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-[#475569]">手机号</span>
-                <div className="relative">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
-                  <input
-                    className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
-                    placeholder="请输入手机号"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    autoComplete="tel"
-                  />
-                </div>
-              </label>
+            {/* Tab Switcher */}
+            <div className="relative mb-6 rounded-lg bg-slate-100 p-1">
+              <div
+                className="absolute inset-y-1 rounded-md bg-white shadow-sm transition-all duration-200"
+                style={{ left: isPhoneMode ? "4px" : "50%", width: "calc(50% - 4px)" }}
+              />
+              <div className="relative grid grid-cols-2">
+                <button
+                  type="button"
+                  className={`relative z-10 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${isPhoneMode ? "text-[#2563EB]" : "text-[#64748B] hover:text-[#475569]"}`}
+                  onClick={() => setActiveTab("phone")}
+                >
+                  手机号注册
+                </button>
+                <button
+                  type="button"
+                  className={`relative z-10 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${!isPhoneMode ? "text-[#2563EB]" : "text-[#64748B] hover:text-[#475569]"}`}
+                  onClick={() => setActiveTab("email")}
+                >
+                  邮箱注册
+                </button>
+              </div>
+            </div>
 
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-[#475569]">验证码</span>
-                <div className="flex gap-3">
-                  <div className="relative flex-1">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
-                    <input
-                      className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
-                      placeholder="请输入短信验证码"
-                      value={smsCode}
-                      onChange={(event) => setSmsCode(event.target.value)}
+            <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
+              {isPhoneMode ? (
+                <>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">手机号</span>
+                    <div className="relative">
+                      <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                      <input
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                        placeholder="请输入手机号"
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        autoComplete="tel"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">验证码</span>
+                    <div className="flex gap-3">
+                      <div className="relative flex-1">
+                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                        <input
+                          className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                          placeholder="请输入短信验证码"
+                          value={smsCode}
+                          onChange={(event) => setSmsCode(event.target.value)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!canSendSms}
+                        onClick={() => void handleSendSms()}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-[#64748B] transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+                      >
+                        {sendingSms ? "发送中..." : smsCountdown > 0 ? `${smsCountdown}s` : "获取验证码"}
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">设置密码</span>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                      <input
+                        type="password"
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                        placeholder="请输入至少 6 位密码"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">邮箱</span>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                      <input
+                        type="email"
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                        placeholder="请输入邮箱地址"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">设置密码</span>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                      <input
+                        type="password"
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                        placeholder="请输入至少 6 位密码"
+                        value={emailPassword}
+                        onChange={(event) => setEmailPassword(event.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-[#475569]">确认密码</span>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+                      <input
+                        type="password"
+                        className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
+                        placeholder="请再次输入密码"
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    {confirmPassword && emailPassword !== confirmPassword && (
+                      <span className="text-xs text-rose-500">两次输入的密码不一致</span>
+                    )}
+                  </label>
+                </>
+              )}
+
+              {/* Password Strength Indicator */}
+              {((isPhoneMode && password) || (!isPhoneMode && emailPassword)) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-[#64748B]">
+                    <span>密码强度</span>
+                    <span className={`font-medium ${passwordScore <= 1 ? 'text-rose-500' : passwordScore === 2 ? 'text-amber-500' : 'text-emerald-500'}`}>{strengthLabel}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${passwordScore <= 1 ? 'bg-rose-400' : passwordScore === 2 ? 'bg-amber-400' : passwordScore === 3 ? 'bg-blue-400' : 'bg-emerald-400'}`}
+                      style={{ width: `${(passwordScore / 4) * 100}%` }}
                     />
                   </div>
-                  <button
-                    type="button"
-                    disabled={!canSendSms}
-                    onClick={() => void handleSendSms()}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-[#64748B] transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
-                  >
-                    {sendingSms ? "发送中..." : smsCountdown > 0 ? `${smsCountdown}s` : "获取验证码"}
-                  </button>
                 </div>
-              </label>
-
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-[#475569]">设置密码</span>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
-                  <input
-                    type="password"
-                    className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
-                    placeholder="请输入至少 6 位密码"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-              </label>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-[#64748B]">
-                  <span>密码强度</span>
-                  <span className={`font-medium ${passwordScore <= 1 ? 'text-rose-500' : passwordScore === 2 ? 'text-amber-500' : 'text-emerald-500'}`}>{strengthLabel}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${passwordScore <= 1 ? 'bg-rose-400' : passwordScore === 2 ? 'bg-amber-400' : passwordScore === 3 ? 'bg-blue-400' : 'bg-emerald-400'}`}
-                    style={{ width: `${(passwordScore / 4) * 100}%` }}
-                  />
-                </div>
-              </div>
+              )}
 
               <label className="flex items-start gap-3 text-sm text-[#475569] cursor-pointer">
                 <input
