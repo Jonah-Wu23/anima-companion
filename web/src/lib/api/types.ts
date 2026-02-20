@@ -101,6 +101,7 @@ export interface AuthLoginPasswordRequest {
   account: string;
   password: string;
   captcha_verify_param: string;
+  remember_me: boolean;
 }
 
 export type AuthSmsScene = "register" | "login" | "reset_password";
@@ -121,6 +122,7 @@ export interface AuthLoginSmsRequest {
   sms_challenge_id: string;
   sms_code: string;
   captcha_verify_param: string;
+  remember_me: boolean;
 }
 
 export interface AuthUser {
@@ -148,6 +150,7 @@ export interface AuthLoginEmailRequest {
   email: string;
   password: string;
   captcha_verify_param: string;
+  remember_me: boolean;
 }
 
 export interface AuthBindEmailRequest {

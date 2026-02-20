@@ -41,6 +41,7 @@ class AuthStore:
     IDENTITY_PHONE = "phone"
     IDENTITY_EMAIL = "email"
     _IDENTITY_TYPES = {IDENTITY_PHONE, IDENTITY_EMAIL}
+    _CORE_TABLES = ("auth_users", "auth_sessions", "auth_sms_challenges", "auth_identities")
 
     def __init__(self, db_path: Path, session_secret: str, session_ttl_seconds: int) -> None:
         self._db_path = db_path
@@ -49,55 +50,73 @@ class AuthStore:
         self._session_ttl_seconds = max(300, int(session_ttl_seconds))
         self._init_tables()
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self, *, ensure_schema: bool = True) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            if ensure_schema and self._has_missing_core_tables(conn):
+                self._init_tables_in_conn(conn)
+            return conn
+        except Exception:
+            conn.close()
+            raise
 
     def _init_tables(self) -> None:
-        with self._connect() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS auth_users (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  account TEXT NOT NULL UNIQUE,
-                  email TEXT,
-                  password_hash TEXT NOT NULL,
-                  created_at INTEGER NOT NULL
-                );
+        with self._connect(ensure_schema=False) as conn:
+            self._init_tables_in_conn(conn)
 
-                CREATE TABLE IF NOT EXISTS auth_sessions (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER NOT NULL,
-                  token_hash TEXT NOT NULL UNIQUE,
-                  created_at INTEGER NOT NULL,
-                  expires_at INTEGER NOT NULL,
-                  revoked_at INTEGER,
-                  FOREIGN KEY(user_id) REFERENCES auth_users(id)
-                );
+    def _has_missing_core_tables(self, conn: sqlite3.Connection) -> bool:
+        placeholders = ",".join("?" for _ in self._CORE_TABLES)
+        rows = conn.execute(
+            f"SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ({placeholders})",
+            self._CORE_TABLES,
+        ).fetchall()
+        existing = {str(row["name"]) for row in rows}
+        return any(table_name not in existing for table_name in self._CORE_TABLES)
 
-                CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
-                CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+    def _init_tables_in_conn(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS auth_users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              account TEXT NOT NULL UNIQUE,
+              email TEXT,
+              password_hash TEXT NOT NULL,
+              created_at INTEGER NOT NULL
+            );
 
-                CREATE TABLE IF NOT EXISTS auth_sms_challenges (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  challenge_id TEXT NOT NULL UNIQUE,
-                  phone TEXT NOT NULL,
-                  scene TEXT NOT NULL,
-                  provider_biz_id TEXT,
-                  created_at INTEGER NOT NULL,
-                  expires_at INTEGER NOT NULL,
-                  used_at INTEGER
-                );
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              token_hash TEXT NOT NULL UNIQUE,
+              created_at INTEGER NOT NULL,
+              expires_at INTEGER NOT NULL,
+              revoked_at INTEGER,
+              FOREIGN KEY(user_id) REFERENCES auth_users(id)
+            );
 
-                CREATE INDEX IF NOT EXISTS idx_auth_sms_phone_scene ON auth_sms_challenges(phone, scene, created_at);
-                CREATE INDEX IF NOT EXISTS idx_auth_sms_expires ON auth_sms_challenges(expires_at);
-                """
-            )
-            self._ensure_auth_users_email_column(conn)
-            self._ensure_auth_users_email_index(conn)
-            self._ensure_auth_identities_table(conn)
-            self._backfill_identities_from_auth_users(conn)
+            CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+
+            CREATE TABLE IF NOT EXISTS auth_sms_challenges (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              challenge_id TEXT NOT NULL UNIQUE,
+              phone TEXT NOT NULL,
+              scene TEXT NOT NULL,
+              provider_biz_id TEXT,
+              created_at INTEGER NOT NULL,
+              expires_at INTEGER NOT NULL,
+              used_at INTEGER
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_auth_sms_phone_scene ON auth_sms_challenges(phone, scene, created_at);
+            CREATE INDEX IF NOT EXISTS idx_auth_sms_expires ON auth_sms_challenges(expires_at);
+            """
+        )
+        self._ensure_auth_users_email_column(conn)
+        self._ensure_auth_users_email_index(conn)
+        self._ensure_auth_identities_table(conn)
+        self._backfill_identities_from_auth_users(conn)
 
     @staticmethod
     def _ensure_auth_users_email_column(conn: sqlite3.Connection) -> None:
@@ -263,6 +282,19 @@ class AuthStore:
     def authenticate_user_by_email(self, email: str, password: str) -> AuthUser | None:
         normalized_email = self.normalize_email(email)
         row = self._find_user_row_by_identity(self.IDENTITY_EMAIL, normalized_email)
+        if row is None:
+            return None
+        if not self._verify_password(password, str(row["password_hash"])):
+            return None
+        return AuthUser(
+            id=int(row["id"]),
+            account=str(row["account"]),
+            created_at=int(row["created_at"]),
+        )
+
+    def authenticate_user_by_phone(self, phone: str, password: str) -> AuthUser | None:
+        normalized_phone = self.normalize_phone(phone)
+        row = self._find_user_row_by_identity(self.IDENTITY_PHONE, normalized_phone)
         if row is None:
             return None
         if not self._verify_password(password, str(row["password_hash"])):

@@ -32,6 +32,7 @@ class AuthLoginPasswordRequest(BaseModel):
     account: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=6, max_length=128)
     captcha_verify_param: str = Field(..., min_length=8)
+    remember_me: bool = True
 
 
 class AuthRegisterEmailRequest(BaseModel):
@@ -54,6 +55,7 @@ class AuthLoginEmailRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=128)
     captcha_verify_param: str = Field(..., min_length=8)
+    remember_me: bool = True
 
     @field_validator("email", mode="before")
     @classmethod
@@ -71,6 +73,7 @@ class AuthLoginSmsRequest(BaseModel):
     sms_challenge_id: str = Field(..., min_length=8, max_length=128)
     sms_code: str = Field(..., min_length=4, max_length=8)
     captcha_verify_param: str = Field(..., min_length=8)
+    remember_me: bool = True
 
 
 class AuthBindPhoneRequest(BaseModel):

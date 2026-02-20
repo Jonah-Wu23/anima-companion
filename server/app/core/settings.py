@@ -67,6 +67,13 @@ def _to_path_list(value: str | None, fallback: list[str]) -> list[str]:
     return parsed or fallback
 
 
+def _resolve_server_path(path_text: str, server_root: Path) -> Path:
+    candidate = Path(path_text)
+    if candidate.is_absolute():
+        return candidate
+    return (server_root / candidate).resolve()
+
+
 @dataclass(frozen=True)
 class Settings:
     server_root: Path
@@ -158,11 +165,9 @@ def get_settings() -> Settings:
     server_root = Path(__file__).resolve().parents[2]
     repo_root = Path(__file__).resolve().parents[3]
     configs_root = Path(os.getenv("CONFIGS_ROOT", str(repo_root / "configs")))
-    sqlite_db_path = Path(
-        os.getenv(
-            "SQLITE_DB_PATH",
-            str(server_root / ".data" / "companion.db"),
-        )
+    sqlite_db_path = _resolve_server_path(
+        os.getenv("SQLITE_DB_PATH", str(server_root / ".data" / "companion.db")),
+        server_root,
     )
     return Settings(
         server_root=server_root,

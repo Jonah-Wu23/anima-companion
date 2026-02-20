@@ -131,7 +131,17 @@ async function loadCaptchaScript(): Promise<void> {
   await scriptLoadPromise;
 }
 
-function createMountElement(id: string, tag: "div" | "button"): HTMLElement {
+function resolveCaptchaMountHost(): HTMLElement {
+  const dialogNodes = Array.from(
+    document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')
+  );
+  if (dialogNodes.length > 0) {
+    return dialogNodes[dialogNodes.length - 1];
+  }
+  return document.body;
+}
+
+function createMountElement(id: string, tag: "div" | "button", host: HTMLElement): HTMLElement {
   const node = document.createElement(tag);
   node.id = id;
   node.style.position = "fixed";
@@ -143,7 +153,7 @@ function createMountElement(id: string, tag: "div" | "button"): HTMLElement {
   node.style.pointerEvents = "none";
   node.style.zIndex = "-1";
   node.style.overflow = "hidden";
-  document.body.appendChild(node);
+  host.appendChild(node);
   return node;
 }
 
@@ -172,8 +182,9 @@ export async function verifyAliyunCaptcha(scene: CaptchaScene): Promise<string> 
     const unique = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const elementId = `aliyun-captcha-element-${unique}`;
     const buttonId = `aliyun-captcha-button-${unique}`;
-    const elementNode = createMountElement(elementId, "div");
-    const buttonNode = createMountElement(buttonId, "button") as HTMLButtonElement;
+    const mountHost = resolveCaptchaMountHost();
+    const elementNode = createMountElement(elementId, "div", mountHost);
+    const buttonNode = createMountElement(buttonId, "button", mountHost) as HTMLButtonElement;
     buttonNode.type = "button";
     buttonNode.tabIndex = -1;
     let finished = false;

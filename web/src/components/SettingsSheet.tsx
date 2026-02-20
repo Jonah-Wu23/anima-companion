@@ -302,7 +302,7 @@ export function SettingsSheet({ isOpen, onClose }: SettingsSheetProps) {
   const canBindPhone = !bindingPhone && normalizedPhone.length >= 11 && smsCodeInput.trim().length >= 4 && smsChallengeId.length > 0;
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Sheet modal={false} open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-[2.5rem] p-0 border-t-0 bg-white/80 backdrop-blur-xl shadow-2xl">
         <div className="h-full flex flex-col w-full max-w-2xl mx-auto">
             {/* 顶部手柄 - 视觉提示 */}

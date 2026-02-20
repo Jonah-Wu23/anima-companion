@@ -2,12 +2,17 @@
 
 import axios from "axios";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Shield, Smartphone, Lock, KeyRound, Mail, ChevronRight, AlertCircle } from "lucide-react";
 
 import { verifyAliyunCaptcha } from "@/lib/auth/aliyun-captcha";
 import { api } from "@/lib/api/client";
+import {
+  clearNonPersistentAuthMarker,
+  markAuthPersistence,
+  shouldInvalidateNonPersistentAuth,
+} from "@/lib/auth/remember-me";
 
 type LoginTab = "password" | "sms" | "email";
 
@@ -24,8 +29,19 @@ function isValidEmail(email: string): boolean {
   return emailRegex.test(email) && email.length <= 254;
 }
 
-export default function LoginPage() {
+function resolveReturnTo(input: string | null): string {
+  if (!input) {
+    return "/chat";
+  }
+  if (!input.startsWith("/") || input.startsWith("//")) {
+    return "/chat";
+  }
+  return input;
+}
+
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<LoginTab>("password");
   
@@ -45,17 +61,53 @@ export default function LoginPage() {
   // Common state
   const [submitting, setSubmitting] = useState(false);
   const [sendingSms, setSendingSms] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const submitLockRef = useRef(false);
+  const returnTo = useMemo(() => resolveReturnTo(searchParams.get("return_to")), [searchParams]);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    void router.prefetch("/chat");
-  }, [router]);
+    void router.prefetch(returnTo);
+  }, [router, returnTo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkSession = async () => {
+      try {
+        if (shouldInvalidateNonPersistentAuth()) {
+          try {
+            await api.logout();
+          } catch {
+            // 忽略网络异常，后续由 me 检查真实登录态
+          } finally {
+            clearNonPersistentAuthMarker();
+          }
+        }
+        await api.me();
+        if (cancelled) {
+          return;
+        }
+        setRedirecting(true);
+        router.replace(returnTo);
+      } catch {
+        // 未登录，停留当前页
+      } finally {
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
+      }
+    };
+    void checkSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, returnTo]);
 
   useEffect(() => {
     if (smsCountdown <= 0) {
@@ -76,7 +128,7 @@ export default function LoginPage() {
   const canSendSms = accountPhone.length >= 11 && smsCountdown <= 0 && !sendingSms;
   
   const canSubmit = useMemo(() => {
-    if (submitting || redirecting) {
+    if (submitting || redirecting || checkingSession) {
       return false;
     }
     if (isPasswordMode) {
@@ -87,7 +139,7 @@ export default function LoginPage() {
     }
     // Email mode
     return isValidEmail(normalizedEmail) && emailPassword.length >= 6;
-  }, [account, accountPhone.length, emailPassword.length, isPasswordMode, isSmsMode, normalizedEmail, password.length, redirecting, smsChallengeId.length, smsCode, submitting]);
+  }, [account, accountPhone.length, checkingSession, emailPassword.length, isPasswordMode, isSmsMode, normalizedEmail, password.length, redirecting, smsChallengeId.length, smsCode, submitting]);
 
   const resolveCommonError = (err: unknown): string => {
     if (axios.isAxiosError(err)) {
@@ -147,6 +199,7 @@ export default function LoginPage() {
           account: account.trim(),
           password,
           captcha_verify_param: captchaVerifyParam,
+          remember_me: rememberMe,
         });
       } else if (isSmsMode) {
         if (!smsChallengeId) {
@@ -157,6 +210,7 @@ export default function LoginPage() {
           sms_challenge_id: smsChallengeId,
           sms_code: smsCode.trim(),
           captcha_verify_param: captchaVerifyParam,
+          remember_me: rememberMe,
         });
       } else {
         // Email mode
@@ -164,11 +218,13 @@ export default function LoginPage() {
           email: normalizedEmail,
           password: emailPassword,
           captcha_verify_param: captchaVerifyParam,
+          remember_me: rememberMe,
         });
       }
+      markAuthPersistence(rememberMe);
       succeeded = true;
       setRedirecting(true);
-      router.replace("/chat");
+      router.replace(returnTo);
     } catch (err) {
       setError(resolveCommonError(err));
     } finally {
@@ -224,7 +280,7 @@ export default function LoginPage() {
                 <Shield className="w-7 h-7 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-[#1E293B]">欢迎回来</h1>
-              <p className="mt-2 text-sm text-[#64748B]">登录你的白厄账号</p>
+              <p className="mt-2 text-sm text-[#64748B]">登录你的账号</p>
             </header>
 
             <div className="relative mb-6 rounded-lg bg-slate-100 p-1">
@@ -275,12 +331,12 @@ export default function LoginPage() {
                 </label>
               ) : (
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-[#475569]">{isSmsMode ? "手机号" : "手机号/用户名"}</span>
+                  <span className="text-sm font-medium text-[#475569]">手机号</span>
                   <div className="relative">
                     <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
                     <input
                       className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
-                      placeholder={isSmsMode ? "请输入手机号" : "请输入手机号或用户名"}
+                      placeholder="请输入手机号"
                       value={account}
                       onChange={(event) => setAccount(event.target.value)}
                       autoComplete={isSmsMode ? "tel" : "username"}
@@ -344,6 +400,16 @@ export default function LoginPage() {
                 </label>
               )}
 
+              <label className="flex items-center gap-2 text-sm text-[#64748B] select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]/30"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                />
+                <span>记住我（7天内免登录）</span>
+              </label>
+
               {error && (
                 <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-600">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -356,7 +422,7 @@ export default function LoginPage() {
                 disabled={!canSubmit}
                 className="w-full rounded-lg bg-[#2563EB] px-4 py-3.5 text-base font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#1D4ED8] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-md"
               >
-                {redirecting ? "登录成功，正在进入..." : submitting ? "登录中..." : "登录"}
+                {redirecting ? "登录成功，正在进入..." : checkingSession ? "检查登录状态..." : submitting ? "登录中..." : "登录"}
               </button>
             </form>
 
@@ -370,5 +436,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#F8FAFC]" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

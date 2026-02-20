@@ -71,9 +71,11 @@ class IntegrityInjectingConnection(sqlite3.Connection):
 
 
 class IntegrityInjectingAuthStore(AuthStore):
-    def _connect(self) -> sqlite3.Connection:  # type: ignore[override]
+    def _connect(self, *, ensure_schema: bool = True) -> sqlite3.Connection:  # type: ignore[override]
         conn = sqlite3.connect(self._db_path, factory=IntegrityInjectingConnection)
         conn.row_factory = sqlite3.Row
+        if ensure_schema and self._has_missing_core_tables(conn):
+            self._init_tables_in_conn(conn)
         return conn
 
 
@@ -274,6 +276,79 @@ def test_auth_password_and_sms_login_flow(tmp_path) -> None:
         app.dependency_overrides.clear()
 
 
+def test_auth_login_without_remember_me_sets_session_cookie(tmp_path) -> None:
+    _override_deps(tmp_path)
+    try:
+        with TestClient(app) as client:
+            send_register_sms_resp = client.post(
+                "/v1/auth/sms/send",
+                json={
+                    "phone": "13800000032",
+                    "scene": "register",
+                    "captcha_verify_param": "captcha-register-param",
+                },
+            )
+            challenge_register = send_register_sms_resp.json()["sms_challenge_id"]
+            register_resp = client.post(
+                "/v1/auth/register",
+                json={
+                    "phone": "13800000032",
+                    "sms_challenge_id": challenge_register,
+                    "sms_code": "123456",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-register-param",
+                },
+            )
+            assert register_resp.status_code == 200
+            client.post("/v1/auth/logout")
+
+            login_resp = client.post(
+                "/v1/auth/login/password",
+                json={
+                    "account": "13800000032",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-login-param",
+                    "remember_me": False,
+                },
+            )
+            assert login_resp.status_code == 200
+            set_cookie = login_resp.headers.get("set-cookie", "")
+            assert "Max-Age=" not in set_cookie
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_auth_register_sets_session_cookie_by_default(tmp_path) -> None:
+    _override_deps(tmp_path)
+    try:
+        with TestClient(app) as client:
+            send_sms_resp = client.post(
+                "/v1/auth/sms/send",
+                json={
+                    "phone": "13800000033",
+                    "scene": "register",
+                    "captcha_verify_param": "captcha-register-param",
+                },
+            )
+            challenge_id = send_sms_resp.json()["sms_challenge_id"]
+
+            register_resp = client.post(
+                "/v1/auth/register",
+                json={
+                    "phone": "13800000033",
+                    "sms_challenge_id": challenge_id,
+                    "sms_code": "123456",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-register-param",
+                },
+            )
+            assert register_resp.status_code == 200
+            set_cookie = register_resp.headers.get("set-cookie", "")
+            assert "Max-Age=" not in set_cookie
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_auth_email_register_and_login_flow(tmp_path) -> None:
     _override_deps(tmp_path)
     try:
@@ -467,6 +542,56 @@ def test_bind_phone_allows_sms_login_for_email_account(tmp_path) -> None:
             )
             assert login_sms_resp.status_code == 200
             assert login_sms_resp.json()["user"]["account"] == account
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_bind_phone_allows_password_login_for_email_account(tmp_path) -> None:
+    _override_deps(tmp_path)
+    try:
+        with TestClient(app) as client:
+            register_email_resp = client.post(
+                "/v1/auth/register/email",
+                json={
+                    "email": "bind.phone.password@example.com",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-register-param",
+                },
+            )
+            assert register_email_resp.status_code == 200
+            account = register_email_resp.json()["user"]["account"]
+
+            bind_sms_challenge = client.post(
+                "/v1/auth/sms/send",
+                json={
+                    "phone": "13800000014",
+                    "scene": "login",
+                    "captcha_verify_param": "captcha-login-param",
+                },
+            ).json()["sms_challenge_id"]
+            bind_phone_resp = client.post(
+                "/v1/auth/bind/phone",
+                json={
+                    "phone": "13800000014",
+                    "sms_challenge_id": bind_sms_challenge,
+                    "sms_code": "123456",
+                    "captcha_verify_param": "captcha-login-param",
+                },
+            )
+            assert bind_phone_resp.status_code == 200
+
+            client.post("/v1/auth/logout")
+
+            password_login_resp = client.post(
+                "/v1/auth/login/password",
+                json={
+                    "account": "13800000014",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-login-param",
+                },
+            )
+            assert password_login_resp.status_code == 200
+            assert password_login_resp.json()["user"]["account"] == account
     finally:
         app.dependency_overrides.clear()
 
@@ -695,3 +820,32 @@ def test_auth_store_startup_migration_backfills_auth_identities(tmp_path) -> Non
     assert "email" in table_columns
     assert "idx_auth_identities_type_value" in index_names
     assert "idx_auth_identities_user_type" in index_names
+
+
+def test_auth_store_recovers_when_auth_tables_missing(tmp_path) -> None:
+    store, _ = _override_deps(tmp_path)
+    try:
+        db_path = tmp_path / "auth.db"
+        with sqlite3.connect(db_path) as conn:
+            conn.executescript(
+                """
+                DROP TABLE IF EXISTS auth_sessions;
+                DROP TABLE IF EXISTS auth_sms_challenges;
+                DROP TABLE IF EXISTS auth_identities;
+                DROP TABLE IF EXISTS auth_users;
+                """
+            )
+
+        with TestClient(app) as client:
+            login_resp = client.post(
+                "/v1/auth/login/password",
+                json={
+                    "account": "13800000099",
+                    "password": "Password123",
+                    "captcha_verify_param": "captcha-login-param",
+                },
+            )
+            assert login_resp.status_code == 401
+            assert login_resp.json()["detail"] == "账号或密码错误"
+    finally:
+        app.dependency_overrides.clear()

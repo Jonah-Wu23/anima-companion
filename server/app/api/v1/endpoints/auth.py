@@ -38,11 +38,18 @@ def _to_user_response(user: AuthUser) -> AuthUserResponse:
     return AuthUserResponse(id=user.id, account=user.account, created_at=user.created_at)
 
 
-def _set_auth_cookie(response: Response, token: str, settings: Settings) -> None:
+def _set_auth_cookie(
+    response: Response,
+    token: str,
+    settings: Settings,
+    *,
+    persistent: bool = True,
+) -> None:
+    max_age = settings.auth_session_ttl_seconds if persistent else None
     response.set_cookie(
         key=settings.auth_cookie_name,
         value=token,
-        max_age=settings.auth_session_ttl_seconds,
+        max_age=max_age,
         httponly=True,
         secure=settings.auth_cookie_secure,
         samesite="lax",
@@ -236,7 +243,7 @@ def register(
         raise HTTPException(status_code=400, detail="注册失败") from exc
 
     session = store.create_session(user.id)
-    _set_auth_cookie(response, session.token, settings)
+    _set_auth_cookie(response, session.token, settings, persistent=False)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 
@@ -266,7 +273,7 @@ def register_email(
         raise HTTPException(status_code=400, detail="注册失败") from exc
 
     session = store.create_session(user.id)
-    _set_auth_cookie(response, session.token, settings)
+    _set_auth_cookie(response, session.token, settings, persistent=False)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 
@@ -283,16 +290,21 @@ def login_password(
         captcha_verify_param=req.captcha_verify_param,
         scene="login",
     )
-    account = req.account
-    normalized_phone = _normalize_phone(account)
+    normalized_account = str(req.account).strip()
+    normalized_phone = _normalize_phone(normalized_account)
+    user: AuthUser | None
     if len(normalized_phone) >= 11:
-        account = normalized_phone
-    user = store.authenticate_user(account=account, password=req.password)
+        user = store.authenticate_user_by_phone(phone=normalized_phone, password=req.password)
+        if user is None:
+            # Backward compatibility fallback: old data may still treat phone as account.
+            user = store.authenticate_user(account=normalized_phone, password=req.password)
+    else:
+        user = store.authenticate_user(account=normalized_account, password=req.password)
     if user is None:
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
     session = store.create_session(user.id)
-    _set_auth_cookie(response, session.token, settings)
+    _set_auth_cookie(response, session.token, settings, persistent=req.remember_me)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 
@@ -315,7 +327,7 @@ def login_email(
         raise HTTPException(status_code=401, detail="账号或密码错误")
 
     session = store.create_session(user.id)
-    _set_auth_cookie(response, session.token, settings)
+    _set_auth_cookie(response, session.token, settings, persistent=req.remember_me)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 
@@ -352,7 +364,7 @@ def login_sms(
     if user is None:
         raise HTTPException(status_code=401, detail="账号或验证码错误")
     session = store.create_session(user.id)
-    _set_auth_cookie(response, session.token, settings)
+    _set_auth_cookie(response, session.token, settings, persistent=req.remember_me)
     return AuthSessionResponse(user=_to_user_response(user), expires_at=session.expires_at)
 
 

@@ -9,6 +9,7 @@ import { Sparkles, UserPlus, Smartphone, KeyRound, Lock, Mail, ChevronRight, Ale
 import { verifyAliyunCaptcha } from "@/lib/auth/aliyun-captcha";
 import { api } from "@/lib/api/client";
 import { useLegalDocumentModal } from "@/components/legal/use-legal-document-modal";
+import { markAuthPersistence } from "@/lib/auth/remember-me";
 
 type RegisterTab = "phone" | "email";
 
@@ -129,9 +130,26 @@ export default function RegisterPage() {
       if (err.response.status === 429) {
         return "操作过于频繁，请稍后再试";
       }
-      const detail = typeof err.response.data?.detail === "string" ? err.response.data.detail : "";
-      if (detail) {
+      const detail = err.response.data?.detail;
+      if (typeof detail === "string" && detail.trim()) {
         return detail;
+      }
+      if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        if (typeof first === "string" && first.trim()) {
+          return first;
+        }
+        if (
+          typeof first === "object" &&
+          first !== null &&
+          "msg" in first &&
+          typeof (first as { msg?: unknown }).msg === "string"
+        ) {
+          return (first as { msg: string }).msg;
+        }
+      }
+      if (typeof err.response.data?.message === "string" && err.response.data.message.trim()) {
+        return err.response.data.message;
       }
       return "注册失败，请稍后重试";
     }
@@ -197,6 +215,7 @@ export default function RegisterPage() {
       } else {
         await handleEmailSubmit(captchaVerifyParam);
       }
+      markAuthPersistence(false);
       succeeded = true;
       setRedirecting(true);
       router.replace("/chat");
@@ -247,7 +266,7 @@ export default function RegisterPage() {
                 <UserPlus className="w-7 h-7 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-[#1E293B]">创建账号</h1>
-              <p className="mt-2 text-sm text-[#64748B]">开启与白厄的专属陪伴</p>
+              <p className="mt-2 text-sm text-[#64748B]">开启与角色的专属陪伴</p>
             </header>
 
             {/* Tab Switcher */}
@@ -275,6 +294,17 @@ export default function RegisterPage() {
             </div>
 
             <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="sr-only pointer-events-none absolute opacity-0"
+                value={isPhoneMode ? normalizedPhone : normalizedEmail}
+                readOnly
+              />
+
               {isPhoneMode ? (
                 <>
                   <label className="block space-y-2">
@@ -297,10 +327,13 @@ export default function RegisterPage() {
                       <div className="relative flex-1">
                         <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
                         <input
+                          type="text"
                           className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-base outline-none transition-all duration-200 focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10"
                           placeholder="请输入短信验证码"
                           value={smsCode}
                           onChange={(event) => setSmsCode(event.target.value)}
+                          autoComplete="one-time-code"
+                          inputMode="numeric"
                         />
                       </div>
                       <button
