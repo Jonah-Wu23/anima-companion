@@ -1,5 +1,9 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const skipBuildChecks = process.env.BT_DEPLOY_SKIP_CHECKS === '1';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {
   reactStrictMode: true,
@@ -12,6 +16,12 @@ const nextConfig = {
     ignoreBuildErrors: skipBuildChecks,
   },
   webpack: (config) => {
+    // 强制全项目共用同一份 three，避免 MMD/R3F 出现多实例导致的运行时异常。
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      three: path.resolve(__dirname, 'node_modules/three'),
+    };
+
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
       {

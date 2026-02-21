@@ -9,7 +9,9 @@
     "dev:web": "npm --workspace web run dev",
     "build:web": "npm --workspace web run build",
     "lint:web": "npm --workspace web run lint",
-    "typecheck:web": "npm --workspace web run typecheck"
+    "typecheck:web": "npm --workspace web run typecheck",
+    "precompress:assets": "node scripts/bootstrap/precompress_local_files_assets.mjs",
+    "optimize:textures:tga": "python scripts/bootstrap/optimize_tga_rle.py"
   },
   "dependencies": {
     "@react-three/postprocessing": "^3.0.4",
@@ -24,6 +26,7 @@
   },
   "overrides": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "0.173.0"
   }
 }

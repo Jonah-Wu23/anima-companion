@@ -45,7 +45,13 @@ type TextureWithReadyCallbacks = THREE.Texture & {
 };
 
 function toEncodedUrl(url: string): string {
-  return encodeURI(url.trim());
+  const normalized = url.trim();
+  try {
+    // 避免对已编码路径再次编码（%E6... -> %25E6...）。
+    return encodeURI(decodeURI(normalized));
+  } catch {
+    return encodeURI(normalized);
+  }
 }
 
 function toDirectoryUrl(url: string): string {
@@ -80,15 +86,20 @@ function normalizePath(path: string): string {
 }
 
 function normalizeToonRelativePath(filePath: string): string {
-  return filePath.replace(/^\.\.\/pmx\/(toon\d+\.(?:png|bmp))$/i, '$1');
+  return filePath.replace(/^(?:\.\.\/)+(?:pmx\/)?(toon\d+\.(?:png|bmp))$/i, '$1');
 }
 
 function normalizeMmdTexturePath(filePath: string): string {
-  const normalized = filePath
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\.\//, '')
-    .replace(/\/{2,}/g, '/');
+  if (!filePath) {
+    return filePath;
+  }
+
+  // 对绝对 URL（http/blob/data 等）不做结构改写，避免破坏协议头。
+  if (/^[a-z][a-z0-9+.-]*:/i.test(filePath)) {
+    return filePath;
+  }
+
+  const normalized = filePath.replace(/\\/g, '/').replace(/^(?:\.\/)+/, '');
   return normalizeToonRelativePath(normalized);
 }
 

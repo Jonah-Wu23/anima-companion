@@ -14,6 +14,8 @@
 - `dev/run_local_stack.ps1`：打印本地联调推荐启动顺序
 - `dev/set_gpt_sovits_weights.ps1`：切换 GPT-SoVITS 的 GPT / SoVITS 权重
 - `dev/start_full_stack.py`：一键按顺序拉起 SenseVoice、GPT-SoVITS、切权重、Server、Web
+- `bootstrap/precompress_local_files_assets.mjs`：为 `assets/`、`configs/` 下大文件生成 `.br/.gz` 预压缩旁路文件（用于 `/api/local-files` 传输提速）
+- `bootstrap/optimize_tga_rle.py`：将大型 `.tga` 贴图重编码为 `TGA-RLE`（默认 dry-run，`--apply` 才会写回）
 - `validation/validate_configs.ps1`：校验人物卡 JSON + `configs/` 下 YAML
 - `validation/optional_web_typecheck.ps1`：可选执行 Web TypeScript 类型检查（依赖缺失可跳过）
 

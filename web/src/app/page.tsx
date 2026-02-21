@@ -42,7 +42,7 @@ export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const { legalDocs, openLegalDocument, legalDocumentModal } = useLegalDocumentModal();
-  const heroBackgrounds = ['/images/hero.png', '/images/hero-luotianyi-illustration-01.jpg'];
+  const heroBackgrounds = ['/images/hero-compressed.webp', '/images/hero-luotianyi-illustration-01-compressed.jpg'];
 
   useEffect(() => {
     setIsLoaded(true);
