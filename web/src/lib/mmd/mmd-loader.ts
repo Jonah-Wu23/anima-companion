@@ -79,6 +79,19 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, '/');
 }
 
+function normalizeToonRelativePath(filePath: string): string {
+  return filePath.replace(/^\.\.\/pmx\/(toon\d+\.(?:png|bmp))$/i, '$1');
+}
+
+function normalizeMmdTexturePath(filePath: string): string {
+  const normalized = filePath
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/{2,}/g, '/');
+  return normalizeToonRelativePath(normalized);
+}
+
 function buildTextureCacheKey(resourcePath: string, filePath: string, params?: unknown): string {
   const normalizedFilePath = normalizePath(filePath.trim());
   const options = params as { isDefaultToonTexture?: boolean } | undefined;
@@ -317,14 +330,25 @@ function patchTextureLoaderWithSharedCache(loader: MMDLoader, enabled: boolean):
 
   const originalLoadTexture = mmdLoader._loadTexture.bind(loader);
   mmdLoader._loadTexture = (filePath, textures, params, onProgress, onError) => {
-    const cacheKey = buildTextureCacheKey(mmdLoader.resourcePath ?? '', filePath, params);
+    const normalizedTexturePath = normalizeMmdTexturePath(filePath) || filePath;
+    const cacheKey = buildTextureCacheKey(
+      mmdLoader.resourcePath ?? '',
+      normalizedTexturePath,
+      params
+    );
     const cached = sharedTextureCache.get(cacheKey);
     if (cached) {
       ensureReadyCallbacksQueue(cached);
       return cached;
     }
 
-    const loaded = originalLoadTexture(filePath, textures, params, onProgress, onError);
+    const loaded = originalLoadTexture(
+      normalizedTexturePath,
+      textures,
+      params,
+      onProgress,
+      onError
+    );
     return sharedTextureCache.set(cacheKey, loaded);
   };
   mmdLoader.__sharedTextureCachePatched = true;
