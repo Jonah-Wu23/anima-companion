@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { NextRequest } from 'next/server';
 
@@ -77,6 +77,47 @@ async function resolveCompatFallback(filePath: string): Promise<string | null> {
   return null;
 }
 
+async function resolveMojibakeFallback(filePath: string): Promise<string | null> {
+  const parentDir = path.dirname(filePath);
+  const expectedName = path.basename(filePath);
+  const expectedExt = path.extname(expectedName).toLowerCase();
+  const encodedExpectedName = encodeURIComponent(expectedName).toLowerCase();
+
+  let entries: string[];
+  try {
+    entries = await readdir(parentDir, { encoding: 'utf8' });
+  } catch {
+    return null;
+  }
+
+  for (const candidateName of entries) {
+    if (path.extname(candidateName).toLowerCase() !== expectedExt) {
+      continue;
+    }
+
+    const encodedCandidateName = encodeURIComponent(candidateName).toLowerCase();
+    if (encodedCandidateName !== encodedExpectedName) {
+      continue;
+    }
+
+    const candidatePath = path.resolve(parentDir, candidateName);
+    if (!candidatePath.startsWith(`${REPO_ROOT}${path.sep}`)) {
+      continue;
+    }
+
+    try {
+      const candidateStat = await stat(candidatePath);
+      if (candidateStat.isFile()) {
+        return candidatePath;
+      }
+    } catch {
+      // 候选文件不可读，继续尝试下一个。
+    }
+  }
+
+  return null;
+}
+
 async function readLocalFileResponse(filePath: string): Promise<Response> {
   const fileStat = await stat(filePath);
   if (!fileStat.isFile()) {
@@ -106,6 +147,15 @@ export async function GET(
   try {
     return await readLocalFileResponse(absolutePath);
   } catch {
+    const mojibakeFallbackPath = await resolveMojibakeFallback(absolutePath);
+    if (mojibakeFallbackPath) {
+      try {
+        return await readLocalFileResponse(mojibakeFallbackPath);
+      } catch {
+        // 若乱码同码兜底失败，继续后续兜底流程。
+      }
+    }
+
     const fallbackPath = await resolveCompatFallback(absolutePath);
     if (!fallbackPath) {
       return new Response('Not found', { status: 404 });
