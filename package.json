@@ -11,7 +11,9 @@
     "lint:web": "npm --workspace web run lint",
     "typecheck:web": "npm --workspace web run typecheck",
     "precompress:assets": "node scripts/bootstrap/precompress_local_files_assets.mjs",
-    "optimize:textures:tga": "python scripts/bootstrap/optimize_tga_rle.py"
+    "optimize:textures:tga": "python scripts/bootstrap/optimize_tga_rle.py",
+    "convert:textures:webp": "python scripts/bootstrap/convert_model_textures_to_webp.py",
+    "verify:textures:webp": "python scripts/validation/verify_model_texture_webp.py"
   },
   "dependencies": {
     "@react-three/postprocessing": "^3.0.4",

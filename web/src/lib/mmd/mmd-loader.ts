@@ -7,6 +7,7 @@ export interface MMDLoadOptions {
   resourcePath?: string;
   useTextureCache?: boolean;
   textureCacheMaxSize?: number;
+  preferWebpTextures?: boolean;
 }
 
 export interface MMDModelWithAnimation {
@@ -43,6 +44,17 @@ type TextureWithReadyCallbacks = THREE.Texture & {
   readyCallbacks?: Array<(texture: THREE.Texture) => void>;
   __readyCallbacksFlushScheduled?: boolean;
 };
+
+const WEBP_TEXTURE_SOURCE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.bmp',
+  '.tga',
+  '.gif',
+  '.sph',
+  '.spa',
+]);
 
 function toEncodedUrl(url: string): string {
   const normalized = url.trim();
@@ -103,10 +115,54 @@ function normalizeMmdTexturePath(filePath: string): string {
   return normalizeToonRelativePath(normalized);
 }
 
+function isAbsoluteUri(filePath: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(filePath);
+}
+
+function splitQueryAndHash(filePath: string): { path: string; suffix: string } {
+  const match = filePath.match(/^([^?#]*)([?#].*)?$/);
+  if (!match) {
+    return { path: filePath, suffix: '' };
+  }
+  return {
+    path: match[1] ?? '',
+    suffix: match[2] ?? '',
+  };
+}
+
+function isDefaultToonTexture(params?: unknown): boolean {
+  const options = params as { isDefaultToonTexture?: boolean } | undefined;
+  return options?.isDefaultToonTexture === true;
+}
+
+export function resolveMmdTextureRequestPath(
+  filePath: string,
+  params?: unknown,
+  preferWebpTextures = true
+): string {
+  if (!preferWebpTextures) {
+    return filePath;
+  }
+  if (!filePath || isAbsoluteUri(filePath) || isDefaultToonTexture(params)) {
+    return filePath;
+  }
+
+  const { path, suffix } = splitQueryAndHash(filePath);
+  const dotIndex = path.lastIndexOf('.');
+  if (dotIndex <= 0) {
+    return filePath;
+  }
+
+  const extension = path.slice(dotIndex).toLowerCase();
+  if (!WEBP_TEXTURE_SOURCE_EXTENSIONS.has(extension)) {
+    return filePath;
+  }
+  return `${path.slice(0, dotIndex)}.webp${suffix}`;
+}
+
 function buildTextureCacheKey(resourcePath: string, filePath: string, params?: unknown): string {
   const normalizedFilePath = normalizePath(filePath.trim());
-  const options = params as { isDefaultToonTexture?: boolean } | undefined;
-  if (options?.isDefaultToonTexture) {
+  if (isDefaultToonTexture(params)) {
     return `toon://${normalizedFilePath.toLowerCase()}`;
   }
   const normalizedResourcePath = normalizePath(resourcePath || '');
@@ -325,8 +381,12 @@ class MMDTextureCache {
 
 const sharedTextureCache = new MMDTextureCache();
 
-function patchTextureLoaderWithSharedCache(loader: MMDLoader, enabled: boolean): void {
-  if (!enabled) {
+function patchTextureLoaderWithSharedCache(
+  loader: MMDLoader,
+  enabled: boolean,
+  preferWebpTextures: boolean
+): void {
+  if (!enabled && !preferWebpTextures) {
     return;
   }
 
@@ -342,9 +402,24 @@ function patchTextureLoaderWithSharedCache(loader: MMDLoader, enabled: boolean):
   const originalLoadTexture = mmdLoader._loadTexture.bind(loader);
   mmdLoader._loadTexture = (filePath, textures, params, onProgress, onError) => {
     const normalizedTexturePath = normalizeMmdTexturePath(filePath) || filePath;
+    const resolvedTexturePath = resolveMmdTextureRequestPath(
+      normalizedTexturePath,
+      params,
+      preferWebpTextures
+    );
+    if (!enabled) {
+      return originalLoadTexture(
+        resolvedTexturePath,
+        textures,
+        params,
+        onProgress,
+        onError
+      );
+    }
+
     const cacheKey = buildTextureCacheKey(
       mmdLoader.resourcePath ?? '',
-      normalizedTexturePath,
+      resolvedTexturePath,
       params
     );
     const cached = sharedTextureCache.get(cacheKey);
@@ -354,7 +429,7 @@ function patchTextureLoaderWithSharedCache(loader: MMDLoader, enabled: boolean):
     }
 
     const loaded = originalLoadTexture(
-      normalizedTexturePath,
+      resolvedTexturePath,
       textures,
       params,
       onProgress,
@@ -368,7 +443,11 @@ function patchTextureLoaderWithSharedCache(loader: MMDLoader, enabled: boolean):
 function createLoader(modelUrl: string, options?: MMDLoadOptions): MMDLoader {
   const loader = new MMDLoader();
   loader.setResourcePath(options?.resourcePath ?? toDirectoryUrl(modelUrl));
-  patchTextureLoaderWithSharedCache(loader, options?.useTextureCache !== false);
+  patchTextureLoaderWithSharedCache(
+    loader,
+    options?.useTextureCache !== false,
+    options?.preferWebpTextures !== false
+  );
   if (options?.textureCacheMaxSize) {
     sharedTextureCache.setMaxSize(options.textureCacheMaxSize);
   }

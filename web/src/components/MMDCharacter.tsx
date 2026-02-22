@@ -24,6 +24,7 @@ import { useSettingsStore } from '@/lib/store/settingsStore';
 
 const PRELOAD_STATES: MotionState[] = ['idle', 'listening', 'speaking', 'thinking', 'error'];
 const SPEAKING_RANDOM_POOL_SIZE = 2;
+const PREFER_WEBP_TEXTURES = process.env.NEXT_PUBLIC_MMD_PREFER_WEBP_TEXTURES !== '0';
 const TALK8_MOTION_IDS = new Set([
   'phainon_bg_loop_chat_015',
   'phainon_bg_loop_chat_016',
@@ -932,6 +933,7 @@ export function MMDCharacter({
         localMesh = await loadPMX(modelPath, {
           resourcePath: toResourcePath(modelPath),
           useTextureCache: true,
+          preferWebpTextures: PREFER_WEBP_TEXTURES,
           onProgress: (progress) => emitProgress(10 + progress * 0.5, '加载 PMX 模型'),
         });
         meshRef.current = localMesh;
