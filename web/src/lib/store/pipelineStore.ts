@@ -4,7 +4,7 @@ import { useAvatarStore } from './avatarStore';
 
 export type PipelineStage = 'idle' | 'recording' | 'uploading' | 'processing' | 'speaking' | 'error';
 export type InputMode = 'vad' | 'push-to-talk' | 'text';
-export type VADStatus = 'idle' | 'listening' | 'speaking' | 'processing';
+export type VADStatus = 'idle' | 'initializing' | 'listening' | 'speaking' | 'processing';
 
 interface PipelineState {
   stage: PipelineStage;

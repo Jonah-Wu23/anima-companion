@@ -52,6 +52,7 @@ const VOICE_MODE_LABELS: Record<InputMode, { label: string; desc: string; icon: 
 
 const VAD_STATUS_CONFIG: Record<VADStatus, { color: string; glow: string; label: string }> = {
   idle: { color: 'bg-slate-400', glow: 'shadow-slate-400/30', label: '待机中' },
+  initializing: { color: 'bg-indigo-400', glow: 'shadow-indigo-400/40', label: '加载中' },
   listening: { color: 'bg-sky-400', glow: 'shadow-sky-400/40', label: '倾听中' },
   speaking: { color: 'bg-amber-400', glow: 'shadow-amber-400/40', label: '聆听中' },
   processing: { color: 'bg-violet-400', glow: 'shadow-violet-400/40', label: '处理中' },
@@ -1230,11 +1231,12 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
 
   const statusMessage = useMemo(() => {
     if (stage === 'error') return pipelineError || '连接错误';
+    if (isVADMode && vadStatus === 'initializing') return 'VAD 首次加载中...';
     if (isVADMode) return vadConfig.label;
     if (isPushToTalkMode && isRecordingLocal) return `录音中 ${recordingDuration.toFixed(1)}s`;
     if (isPipelineBusy) return '处理中...';
     return '准备就绪';
-  }, [stage, pipelineError, isVADMode, vadConfig.label, isPushToTalkMode, isRecordingLocal, recordingDuration, isPipelineBusy]);
+  }, [stage, pipelineError, isVADMode, vadStatus, vadConfig.label, isPushToTalkMode, isRecordingLocal, recordingDuration, isPipelineBusy]);
 
   const handleActivateVip = useCallback(() => {
     setIsVipModalOpen(false);
@@ -1278,7 +1280,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
             <ModeSelector 
               currentMode={inputMode} 
               onModeChange={handleInputModeChange}
-              disabled={isPipelineBusy || isRecordingLocal}
+              disabled={isPipelineBusy || isRecordingLocal || vadStatus === 'initializing'}
             />
             
             <div className="flex items-center gap-2">
@@ -1430,6 +1432,14 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
           )}
 
           {/* VAD Hints */}
+          {isVADMode && vadStatus === 'initializing' && !isPipelineBusy && (
+            <div className="px-4 pb-4 text-center">
+              <span className="text-xs text-indigo-500">
+                正在加载 VAD 模型，需要0.5-1分钟，清耐心等待
+              </span>
+            </div>
+          )}
+
           {isVADMode && vadStatus === 'idle' && !isPipelineBusy && (
             <div className="px-4 pb-4 text-center">
               <span className="text-xs text-slate-400">

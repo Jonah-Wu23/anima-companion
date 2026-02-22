@@ -18,7 +18,7 @@ type MicVADModule = {
   };
 };
 
-export type VADRecorderStatus = 'idle' | 'listening' | 'speaking' | 'processing';
+export type VADRecorderStatus = 'idle' | 'initializing' | 'listening' | 'speaking' | 'processing';
 
 export interface VADRecorderOptions {
   onSpeechStart: () => void;
@@ -81,6 +81,8 @@ export class VADRecorder {
   private vad: MicVADInstance | null = null;
   private running = false;
   private status: VADRecorderStatus = 'idle';
+  private startingPromise: Promise<void> | null = null;
+  private startRequestId = 0;
 
   constructor(private readonly options: VADRecorderOptions) {}
 
@@ -89,23 +91,52 @@ export class VADRecorder {
       return;
     }
 
-    try {
-      const instance = this.vad ?? (await this.createVADInstance());
-      this.vad = instance;
-      instance.start();
-      this.running = true;
-      this.setStatus('listening');
-    } catch (error) {
-      const normalized = normalizeError(error, 'VAD 启动失败');
-      this.running = false;
-      this.setStatus('idle');
-      this.options.onError?.(normalized);
-      throw normalized;
+    if (this.startingPromise) {
+      await this.startingPromise;
+      return;
     }
+
+    const requestId = ++this.startRequestId;
+    this.setStatus('initializing');
+
+    this.startingPromise = (async () => {
+      try {
+        const instance = this.vad ?? (await this.createVADInstance());
+        this.vad = instance;
+
+        if (requestId !== this.startRequestId) {
+          instance.pause();
+          return;
+        }
+
+        await instance.start();
+
+        if (requestId !== this.startRequestId) {
+          instance.pause();
+          return;
+        }
+
+        this.running = true;
+        this.setStatus('listening');
+      } catch (error) {
+        const normalized = normalizeError(error, 'VAD 启动失败');
+        this.running = false;
+        this.setStatus('idle');
+        this.options.onError?.(normalized);
+        throw normalized;
+      } finally {
+        this.startingPromise = null;
+      }
+    })();
+
+    await this.startingPromise;
   }
 
   stop(): void {
+    this.startRequestId += 1;
+
     if (!this.running) {
+      this.setStatus('idle');
       return;
     }
 
