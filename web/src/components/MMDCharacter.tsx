@@ -13,7 +13,13 @@ import { ExpressionDriver, type ExpressionEmotion } from '@/lib/mmd/expression-d
 import { ensureAmmoLoaded } from '@/lib/mmd/ammo-loader';
 import { MMDAnimationManager, type AnimationSnapshot } from '@/lib/mmd/mmd-animation';
 import { MemoryMonitor } from '@/lib/mmd/memory-monitor';
-import { disposeMMDMesh, getMMDTextureCacheStats, loadPMX, loadVMDAnimation } from '@/lib/mmd/mmd-loader';
+import {
+  disposeMMDMesh,
+  getMMDTextureCacheStats,
+  loadPMX,
+  loadVMDAnimation,
+  waitForMMDMeshTexturesReady,
+} from '@/lib/mmd/mmd-loader';
 import { MotionCache } from '@/lib/mmd/motion-cache';
 import { MotionManifestLoader } from '@/lib/mmd/motion-manifest';
 import { MotionDriver, type MotionTouchZone } from '@/lib/mmd/motion-driver';
@@ -1008,6 +1014,16 @@ export function MMDCharacter({
             });
           }
         });
+
+        emitProgress(59, '等待贴图材质');
+        const textureReady = await waitForMMDMeshTexturesReady(localMesh, { timeoutMs: 12000 });
+        if (process.env.NODE_ENV === 'development' && textureReady.timedOut) {
+          console.warn('[mmd] 部分贴图等待超时，已继续渲染', textureReady);
+        }
+        if (cancelled) {
+          disposeMMDMesh(localMesh);
+          return;
+        }
 
         emitProgress(60, '初始化动画控制器');
         localManager = new MMDAnimationManager(localMesh, {

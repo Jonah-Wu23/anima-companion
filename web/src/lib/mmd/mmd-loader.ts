@@ -15,16 +15,25 @@ export interface MMDModelWithAnimation {
   clip: THREE.AnimationClip;
 }
 
-type MMDLoaderWithTextureHook = MMDLoader & {
-  _loadTexture?: (
-    filePath: string,
-    textures: Record<string, THREE.Texture>,
-    params?: unknown,
-    onProgress?: (event: ProgressEvent<EventTarget>) => void,
-    onError?: (error: unknown) => void
-  ) => THREE.Texture;
+type TextureLoadHook = (
+  filePath: string,
+  textures: Record<string, THREE.Texture>,
+  params?: unknown,
+  onProgress?: (event: ProgressEvent<EventTarget>) => void,
+  onError?: (error: unknown) => void
+) => THREE.Texture;
+
+type MMDMaterialBuilderWithTextureHook = {
+  _loadTexture?: TextureLoadHook;
   resourcePath?: string;
   __sharedTextureCachePatched?: boolean;
+};
+
+type MMDLoaderWithMaterialBuilder = MMDLoader & {
+  meshBuilder?: {
+    materialBuilder?: MMDMaterialBuilderWithTextureHook;
+  };
+  resourcePath?: string;
 };
 
 interface TextureCacheEntry {
@@ -45,6 +54,16 @@ type TextureWithReadyCallbacks = THREE.Texture & {
   __readyCallbacksFlushScheduled?: boolean;
 };
 
+export interface WaitTextureReadyOptions {
+  timeoutMs?: number;
+}
+
+export interface WaitTextureReadyResult {
+  total: number;
+  pending: number;
+  timedOut: boolean;
+}
+
 const WEBP_TEXTURE_SOURCE_EXTENSIONS = new Set([
   '.png',
   '.jpg',
@@ -55,6 +74,8 @@ const WEBP_TEXTURE_SOURCE_EXTENSIONS = new Set([
   '.sph',
   '.spa',
 ]);
+const DEBUG_MMD_WEBP = process.env.NEXT_PUBLIC_DEBUG_MMD_WEBP === '1';
+let debugWebpRewriteLogCount = 0;
 
 function toEncodedUrl(url: string): string {
   const normalized = url.trim();
@@ -236,6 +257,74 @@ function collectMeshTextures(mesh: THREE.SkinnedMesh): Set<THREE.Texture> {
   return textures;
 }
 
+function isTextureImageReady(texture: THREE.Texture): boolean {
+  const textureRecord = texture as unknown as { image?: unknown; source?: { data?: unknown } };
+  const image = textureRecord.image ?? textureRecord.source?.data;
+  if (!image) {
+    return false;
+  }
+
+  const maybeImage = image as {
+    complete?: boolean;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    width?: number;
+    height?: number;
+    data?: unknown;
+  };
+
+  if (typeof maybeImage.complete === 'boolean') {
+    if (!maybeImage.complete) {
+      return false;
+    }
+    if (typeof maybeImage.naturalWidth === 'number') {
+      return maybeImage.naturalWidth > 0;
+    }
+    return true;
+  }
+
+  if (typeof maybeImage.width === 'number' && typeof maybeImage.height === 'number') {
+    return maybeImage.width > 0 && maybeImage.height > 0;
+  }
+
+  if (maybeImage.data) {
+    return true;
+  }
+
+  return true;
+}
+
+function waitTextureReady(texture: THREE.Texture, timeoutMs: number): Promise<boolean> {
+  if (isTextureImageReady(texture)) {
+    return Promise.resolve(false);
+  }
+
+  const textureWithCallbacks = texture as TextureWithReadyCallbacks;
+  if (Array.isArray(textureWithCallbacks.readyCallbacks)) {
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const timeoutId = globalThis.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(true);
+      }, timeoutMs);
+
+      textureWithCallbacks.readyCallbacks?.push(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        globalThis.clearTimeout(timeoutId);
+        resolve(false);
+      });
+    });
+  }
+
+  return Promise.resolve(false);
+}
+
 class MMDTextureCache {
   private readonly entries = new Map<string, TextureCacheEntry>();
   private readonly textureToKey = new WeakMap<THREE.Texture, string>();
@@ -390,23 +479,39 @@ function patchTextureLoaderWithSharedCache(
     return;
   }
 
-  const mmdLoader = loader as MMDLoaderWithTextureHook;
-  if (mmdLoader.__sharedTextureCachePatched) {
+  const mmdLoader = loader as MMDLoaderWithMaterialBuilder;
+  const materialBuilder = mmdLoader.meshBuilder?.materialBuilder;
+  if (!materialBuilder) {
     return;
   }
 
-  if (typeof mmdLoader._loadTexture !== 'function') {
+  if (materialBuilder.__sharedTextureCachePatched) {
     return;
   }
 
-  const originalLoadTexture = mmdLoader._loadTexture.bind(loader);
-  mmdLoader._loadTexture = (filePath, textures, params, onProgress, onError) => {
+  if (typeof materialBuilder._loadTexture !== 'function') {
+    return;
+  }
+
+  const originalLoadTexture = materialBuilder._loadTexture.bind(materialBuilder);
+  materialBuilder._loadTexture = (filePath, textures, params, onProgress, onError) => {
     const normalizedTexturePath = normalizeMmdTexturePath(filePath) || filePath;
     const resolvedTexturePath = resolveMmdTextureRequestPath(
       normalizedTexturePath,
       params,
       preferWebpTextures
     );
+    if (
+      DEBUG_MMD_WEBP &&
+      resolvedTexturePath !== normalizedTexturePath &&
+      debugWebpRewriteLogCount < 24
+    ) {
+      debugWebpRewriteLogCount += 1;
+      console.info('[mmd-webp] rewrite texture path', {
+        from: normalizedTexturePath,
+        to: resolvedTexturePath,
+      });
+    }
     if (!enabled) {
       return originalLoadTexture(
         resolvedTexturePath,
@@ -418,7 +523,7 @@ function patchTextureLoaderWithSharedCache(
     }
 
     const cacheKey = buildTextureCacheKey(
-      mmdLoader.resourcePath ?? '',
+      materialBuilder.resourcePath ?? mmdLoader.resourcePath ?? '',
       resolvedTexturePath,
       params
     );
@@ -437,7 +542,7 @@ function patchTextureLoaderWithSharedCache(
     );
     return sharedTextureCache.set(cacheKey, loaded);
   };
-  mmdLoader.__sharedTextureCachePatched = true;
+  materialBuilder.__sharedTextureCachePatched = true;
 }
 
 function createLoader(modelUrl: string, options?: MMDLoadOptions): MMDLoader {
@@ -538,6 +643,33 @@ export function getMMDTextureCacheStats(): TextureCacheStats {
 
 export function clearMMDTextureCache(force = false): void {
   sharedTextureCache.clear(force);
+}
+
+export async function waitForMMDMeshTexturesReady(
+  mesh: THREE.SkinnedMesh,
+  options?: WaitTextureReadyOptions
+): Promise<WaitTextureReadyResult> {
+  const timeoutMs = Math.max(100, Math.floor(options?.timeoutMs ?? 12000));
+  const textures = Array.from(collectMeshTextures(mesh));
+  const pendingTextures = textures.filter((texture) => !isTextureImageReady(texture));
+
+  if (pendingTextures.length === 0) {
+    return {
+      total: textures.length,
+      pending: 0,
+      timedOut: false,
+    };
+  }
+
+  const results = await Promise.all(
+    pendingTextures.map((texture) => waitTextureReady(texture, timeoutMs))
+  );
+
+  return {
+    total: textures.length,
+    pending: pendingTextures.length,
+    timedOut: results.some(Boolean),
+  };
 }
 
 export function loadVMDAnimation(

@@ -415,8 +415,8 @@ export default function Viewport3D() {
       </Canvas>
 
       {modelStatus === 'loading' && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-end p-3">
-          <ModelLoadingIndicator progress={modelProgress} statusText="MMD 角色加载中" />
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-900/25 backdrop-blur-[1px] p-4">
+          <ModelLoadingIndicator progress={modelProgress} statusText="模型材质加载中" />
         </div>
       )}
     </div>

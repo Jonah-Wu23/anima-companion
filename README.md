@@ -2,6 +2,8 @@
 
 二次元情感陪伴助手（Web/PWA）：文字聊天、语音聊天、3D 角色互动、换装、回忆相册。
 
+在线体验（已上线）：https://anima-companion.fun
+
 <!-- PROJECT SHIELDS -->
 
 [![Contributors][contributors-shield]][contributors-url]
