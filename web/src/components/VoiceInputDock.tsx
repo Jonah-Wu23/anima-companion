@@ -167,6 +167,16 @@ function extractApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const normalized = base64.trim();
+  const binary = window.atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer.slice(0);
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -471,6 +481,8 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const isStoppingRef = useRef(false);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioObjectUrlRef = useRef<string | null>(null);
+  const webAudioPlaybackRef = useRef<{ context: AudioContext; source: AudioBufferSourceNode } | null>(null);
   const lipSyncRafRef = useRef<number | null>(null);
   const lipSyncContextRef = useRef<AudioContext | null>(null);
   const lipSyncAnalyserRef = useRef<AnalyserNode | null>(null);
@@ -551,6 +563,33 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     setLipSyncEnergy(0);
   }, [setLipSyncEnergy]);
 
+  const revokeAudioObjectUrl = useCallback(() => {
+    if (!audioObjectUrlRef.current) {
+      return;
+    }
+    URL.revokeObjectURL(audioObjectUrlRef.current);
+    audioObjectUrlRef.current = null;
+  }, []);
+
+  const stopWebAudioPlayback = useCallback(() => {
+    const playback = webAudioPlaybackRef.current;
+    webAudioPlaybackRef.current = null;
+    if (!playback) {
+      return;
+    }
+
+    playback.source.onended = null;
+    try {
+      playback.source.stop(0);
+    } catch {
+      // source 可能已经结束
+    }
+    playback.source.disconnect();
+    if (playback.context.state !== 'closed') {
+      void playback.context.close().catch(() => {});
+    }
+  }, []);
+
   const stopPlaybackAndLipSync = useCallback((pauseAudio = true) => {
     const activeAudio = audioPlayerRef.current;
     if (activeAudio) {
@@ -561,8 +600,10 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       }
       audioPlayerRef.current = null;
     }
+    stopWebAudioPlayback();
+    revokeAudioObjectUrl();
     stopLipSyncTracking();
-  }, [stopLipSyncTracking]);
+  }, [revokeAudioObjectUrl, stopLipSyncTracking, stopWebAudioPlayback]);
 
   const startLipSyncTracking = useCallback((audio: HTMLAudioElement) => {
     const AudioContextCtor = window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
@@ -610,11 +651,65 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     }
   }, [setLipSyncEnergy, stopLipSyncTracking]);
 
+  const playAssistantAudioWithWebAudio = useCallback(async (audioBase64: string): Promise<boolean> => {
+    const AudioContextCtor = window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
+    if (!AudioContextCtor) {
+      return false;
+    }
+
+    let context: AudioContext | null = null;
+    try {
+      context = new AudioContextCtor();
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+
+      const audioBuffer = base64ToArrayBuffer(audioBase64);
+      const decoded = await context.decodeAudioData(audioBuffer.slice(0));
+      const source = context.createBufferSource();
+      source.buffer = decoded;
+      source.connect(context.destination);
+
+      const playback = { context, source };
+      webAudioPlaybackRef.current = playback;
+      source.onended = () => {
+        if (webAudioPlaybackRef.current !== playback) {
+          return;
+        }
+        webAudioPlaybackRef.current = null;
+        if (context && context.state !== 'closed') {
+          void context.close().catch(() => {});
+        }
+        setStage('idle');
+      };
+
+      source.start(0);
+      setLipSyncEnergy(0);
+      return true;
+    } catch {
+      if (context && context.state !== 'closed') {
+        void context.close().catch(() => {});
+      }
+      if (webAudioPlaybackRef.current?.context === context) {
+        webAudioPlaybackRef.current = null;
+      }
+      return false;
+    }
+  }, [setLipSyncEnergy, setStage]);
+
   const playAssistantAudioBase64 = useCallback(async (audioBase64: string) => {
     setStage('speaking');
     stopPlaybackAndLipSync(true);
 
-    const audio = new Audio(`data:audio/wav;base64,${audioBase64}`);
+    const audioBuffer = base64ToArrayBuffer(audioBase64);
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    audioObjectUrlRef.current = audioUrl;
+
+    const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
+    audio.setAttribute('playsinline', 'true');
+    audio.setAttribute('webkit-playsinline', 'true');
     audioPlayerRef.current = audio;
 
     audio.onended = () => {
@@ -632,10 +727,31 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
         startLipSyncTracking(audio);
       }
     } catch {
+      if (audioPlayerRef.current === audio) {
+        audioPlayerRef.current = null;
+      }
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      revokeAudioObjectUrl();
+
+      const playedByWebAudio = await playAssistantAudioWithWebAudio(audioBase64);
+      if (playedByWebAudio) {
+        return;
+      }
+
+      setError('当前移动端浏览器限制了自动音频播放，请点击页面后重试');
       stopPlaybackAndLipSync(false);
       setStage('idle');
     }
-  }, [setStage, startLipSyncTracking, stopPlaybackAndLipSync]);
+  }, [
+    playAssistantAudioWithWebAudio,
+    revokeAudioObjectUrl,
+    setError,
+    setStage,
+    startLipSyncTracking,
+    stopPlaybackAndLipSync,
+  ]);
 
   // ==========================================================================
   // VAD Recorder

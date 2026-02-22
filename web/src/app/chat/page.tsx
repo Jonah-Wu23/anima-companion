@@ -45,6 +45,7 @@ export default function Home() {
   const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const mainRef = useRef<HTMLElement | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const activeResizePointerIdRef = useRef<number | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function Home() {
   }, []);
 
   const stopResizeViewport = useCallback(() => {
+    activeResizePointerIdRef.current = null;
     resizeCleanupRef.current?.();
     resizeCleanupRef.current = null;
     setIsResizingViewport(false);
@@ -76,28 +78,64 @@ export default function Home() {
         return;
       }
 
+      const resizeHandle = event.currentTarget;
+      const pointerId = event.pointerId;
+
       event.preventDefault();
       stopResizeViewport();
+      activeResizePointerIdRef.current = pointerId;
       setIsResizingViewport(true);
       updateMobileViewportHeight(event.clientY);
 
+      if (resizeHandle.setPointerCapture) {
+        try {
+          resizeHandle.setPointerCapture(pointerId);
+        } catch {
+          // 某些移动浏览器可能不支持/拒绝 pointer capture，忽略即可。
+        }
+      }
+
       const onPointerMove = (moveEvent: PointerEvent) => {
-        moveEvent.preventDefault();
+        if (activeResizePointerIdRef.current !== moveEvent.pointerId) {
+          return;
+        }
         updateMobileViewportHeight(moveEvent.clientY);
       };
 
-      const onPointerEnd = () => {
+      const onPointerEnd = (endEvent: PointerEvent) => {
+        if (activeResizePointerIdRef.current !== endEvent.pointerId) {
+          return;
+        }
         stopResizeViewport();
       };
 
-      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      const onLostPointerCapture = () => {
+        stopResizeViewport();
+      };
+
+      const onVisibilityChange = () => {
+        if (document.hidden) {
+          stopResizeViewport();
+        }
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerEnd);
       window.addEventListener('pointercancel', onPointerEnd);
+      window.addEventListener('blur', onLostPointerCapture);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      resizeHandle.addEventListener('lostpointercapture', onLostPointerCapture);
 
       resizeCleanupRef.current = () => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerEnd);
         window.removeEventListener('pointercancel', onPointerEnd);
+        window.removeEventListener('blur', onLostPointerCapture);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        resizeHandle.removeEventListener('lostpointercapture', onLostPointerCapture);
+        if (resizeHandle.hasPointerCapture?.(pointerId)) {
+          resizeHandle.releasePointerCapture(pointerId);
+        }
       };
     },
     [isDesktopLayout, stopResizeViewport, updateMobileViewportHeight]

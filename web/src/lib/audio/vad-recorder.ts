@@ -1,8 +1,10 @@
 import { resolveVADConfig } from '@/lib/audio/vad-config';
 
 const VAD_SAMPLE_RATE = 16000;
-const VAD_WEB_ASSET_BASE_PATH = '/vad-web/';
-const ORT_ASSET_BASE_PATH = '/onnxruntime/';
+// 资源路径版本号用于强制绕过 CDN/浏览器旧缓存，避免 VAD 资产升级后仍命中旧文件。
+const VAD_ASSET_VERSION = '2026-02-22-1';
+const VAD_WEB_ASSET_BASE_PATH = `/vad-web-${VAD_ASSET_VERSION}/`;
+const ORT_ASSET_BASE_PATH = `/onnxruntime-${VAD_ASSET_VERSION}/`;
 
 type MicVADInstance = {
   start: () => void;
