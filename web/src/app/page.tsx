@@ -261,7 +261,7 @@ export default function HomePage() {
             <Star className="w-7 h-7 text-amber-600 fill-amber-600" />
           </div>
           <h2 className="text-3xl font-bold text-[#1E293B] mb-4">
-            喜欢白厄？支持我们
+            喜欢本项目？支持我们
           </h2>
           <p className="text-[#475569] mb-8 max-w-md mx-auto">
             项目需要服务器和AI模型费用才能持续运行，你的每一份支持都让我们能做得更好

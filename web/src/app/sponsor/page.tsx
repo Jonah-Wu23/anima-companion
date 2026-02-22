@@ -106,7 +106,7 @@ export default function SponsorPage() {
 
             <div className="text-center">
               <h1 className="text-2xl sm:text-3xl font-bold text-[#1E293B]">
-                喜欢白厄的话，请给我们一点支持
+                喜欢本项目的话，请给我们一点支持
               </h1>
               <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#64748B]">
                 项目需要服务器和模型费用才能持续运行，你的每一份支持都能让我们继续稳定更新与陪伴。
