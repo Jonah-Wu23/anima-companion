@@ -32,6 +32,15 @@ const nextConfig = {
     ];
     return config;
   },
+  async rewrites() {
+    return [
+      // 兼容旧前端/缓存中仍请求的历史头像路径，避免 404。
+      {
+        source: '/assets/luotianyi-profile.jpg',
+        destination: '/assets/luotianyi-chat-avatar.png',
+      },
+    ];
+  },
   async headers() {
     return [
       {
