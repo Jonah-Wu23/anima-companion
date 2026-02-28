@@ -208,7 +208,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: '洛天依基础形象，默认模型',
     directory: 'assets/models/LuoTianyi_V4',
     pmxFile: 'luotianyi_v4_ver3.3.pmx',
-    thumbnail: '/assets/luotianyi-profile.jpg',
+    thumbnail: '/assets/luotianyi-chat-avatar.png',
     tags: ['基础', '默认'],
     isAvailable: true,
     author: 'Nanoda，Kinsama',

@@ -46,3 +46,17 @@ def test_user_clear_endpoint_removes_all_session_records(tmp_path) -> None:
     assert msg_count == 0
     assert memory_count == 0
     assert relation_count == 0
+
+
+def test_session_store_auto_repairs_missing_messages_table(tmp_path) -> None:
+    db_path = tmp_path / "session.db"
+    store = SessionStore(db_path)
+    session_id = "s-repair-1"
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DROP TABLE messages")
+
+    store.add_message(session_id, "user", "hello")
+    rows = store.list_recent_messages(session_id, limit=5)
+
+    assert rows == [{"role": "user", "content": "hello"}]

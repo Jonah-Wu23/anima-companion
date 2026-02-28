@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T")
 
 
 class SessionStore:
@@ -51,16 +53,32 @@ class SessionStore:
                 """
             )
 
+    @staticmethod
+    def _is_missing_table_error(exc: sqlite3.OperationalError) -> bool:
+        return "no such table" in str(exc).lower()
+
+    def _run_with_schema_retry(self, action: Callable[[sqlite3.Connection], T]) -> T:
+        try:
+            with self._connect() as conn:
+                return action(conn)
+        except sqlite3.OperationalError as exc:
+            if not self._is_missing_table_error(exc):
+                raise
+            self._init_tables()
+            with self._connect() as conn:
+                return action(conn)
+
     def add_message(self, session_id: str, role: str, content: str) -> None:
-        with self._connect() as conn:
-            conn.execute(
+        self._run_with_schema_retry(
+            lambda conn: conn.execute(
                 "INSERT INTO messages(session_id, role, content) VALUES(?, ?, ?)",
                 (session_id, role, content),
             )
+        )
 
     def list_recent_messages(self, session_id: str, limit: int = 12) -> list[dict[str, str]]:
-        with self._connect() as conn:
-            rows = conn.execute(
+        rows = self._run_with_schema_retry(
+            lambda conn: conn.execute(
                 """
                 SELECT role, content
                 FROM messages
@@ -70,22 +88,24 @@ class SessionStore:
                 """,
                 (session_id, limit),
             ).fetchall()
+        )
         rows.reverse()
         return [{"role": str(row["role"]), "content": str(row["content"])} for row in rows]
 
     def count_user_turns(self, session_id: str) -> int:
-        with self._connect() as conn:
-            row = conn.execute(
+        row = self._run_with_schema_retry(
+            lambda conn: conn.execute(
                 "SELECT COUNT(*) AS count FROM messages WHERE session_id = ? AND role = 'user'",
                 (session_id,),
             ).fetchone()
+        )
         return int(row["count"]) if row else 0
 
     def upsert_memories(self, session_id: str, memory_writes: list[dict[str, str]]) -> None:
         if not memory_writes:
             return
-        with self._connect() as conn:
-            conn.executemany(
+        self._run_with_schema_retry(
+            lambda conn: conn.executemany(
                 """
                 INSERT INTO memories(session_id, key, value, type)
                 VALUES(?, ?, ?, ?)
@@ -101,13 +121,15 @@ class SessionStore:
                     if item.get("key") and item.get("value")
                 ],
             )
+        )
 
     def get_relationship(self, session_id: str) -> dict[str, int]:
-        with self._connect() as conn:
-            row = conn.execute(
+        row = self._run_with_schema_retry(
+            lambda conn: conn.execute(
                 "SELECT trust, reliance, fatigue FROM relationship WHERE session_id = ?",
                 (session_id,),
             ).fetchone()
+        )
         if row is None:
             return {"trust": 0, "reliance": 0, "fatigue": 0}
         return {
@@ -126,8 +148,8 @@ class SessionStore:
             "reliance": current["reliance"] + reliance_delta,
             "fatigue": current["fatigue"] + fatigue_delta,
         }
-        with self._connect() as conn:
-            conn.execute(
+        self._run_with_schema_retry(
+            lambda conn: conn.execute(
                 """
                 INSERT INTO relationship(session_id, trust, reliance, fatigue)
                 VALUES(?, ?, ?, ?)
@@ -145,6 +167,7 @@ class SessionStore:
                     updated["fatigue"],
                 ),
             )
+        )
         return {
             "trust": trust_delta,
             "reliance": reliance_delta,
@@ -152,7 +175,10 @@ class SessionStore:
         }
 
     def clear_session(self, session_id: str) -> None:
-        with self._connect() as conn:
-            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-            conn.execute("DELETE FROM memories WHERE session_id = ?", (session_id,))
-            conn.execute("DELETE FROM relationship WHERE session_id = ?", (session_id,))
+        self._run_with_schema_retry(
+            lambda conn: (
+                conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,)),
+                conn.execute("DELETE FROM memories WHERE session_id = ?", (session_id,)),
+                conn.execute("DELETE FROM relationship WHERE session_id = ?", (session_id,)),
+            )
+        )
