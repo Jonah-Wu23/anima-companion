@@ -180,6 +180,10 @@ def _sanitize_assistant_text(raw_text: str, max_chars: int = ASSISTANT_TEXT_CHAR
     speak_text = _extract_tts_speak_text(text)
     if speak_text:
         text = speak_text
+    else:
+        quoted_text = _extract_quoted_dialogue(text)
+        if quoted_text:
+            text = quoted_text
 
     # 去除常见动作/旁白包裹内容，只保留可直接说出口的台词。
     text = re.sub(r"\[[^\[\]]{1,60}\]", "", text)
@@ -196,6 +200,9 @@ def _sanitize_assistant_text(raw_text: str, max_chars: int = ASSISTANT_TEXT_CHAR
                 selected = line
                 break
         text = selected or lines[0]
+
+    if _looks_like_narration_only(text):
+        return "我在。"
 
     text = re.sub(r"\s+", "", text)
     if not text:
@@ -233,6 +240,60 @@ def _extract_tts_speak_text(raw_text: str) -> str:
 
 def _has_pronounceable_content(text: str) -> bool:
     return bool(re.search(r"[0-9A-Za-z\u4e00-\u9fff]", str(text or "")))
+
+
+def _extract_quoted_dialogue(text: str) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+
+    patterns = (
+        r"[“\"]([^“”\"<>]{1,80})[”\"]",
+        r"「([^「」<>]{1,80})」",
+        r"『([^『』<>]{1,80})』",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, raw)
+        if not match:
+            continue
+        candidate = match.group(1).strip()
+        if candidate and _has_pronounceable_content(candidate):
+            return candidate
+    return ""
+
+
+def _looks_like_narration_only(text: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(text or ""))
+    if not normalized:
+        return True
+
+    if _extract_quoted_dialogue(normalized):
+        return False
+
+    if re.match(r"^(他|她|它|他们|她们|它们)", normalized):
+        narration_markers = (
+            "耳尖",
+            "嘴角",
+            "目光",
+            "后脑勺",
+            "脚步",
+            "笑着",
+            "轻轻",
+            "微微",
+            "缓缓",
+            "抬手",
+            "垂眸",
+            "转身",
+            "迈",
+            "走向",
+            "朝",
+            "向",
+        )
+        score = sum(1 for marker in narration_markers if marker in normalized)
+        if score >= 2:
+            return True
+
+    return False
 
 
 def _resolve_assistant_text_limit(persona_id: str) -> int:

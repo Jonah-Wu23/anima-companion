@@ -37,9 +37,11 @@ export const usePipelineStore = create<PipelineState>((set) => ({
         // 开发期最小状态流转日志，便于快速确认主链路与恢复链路。
         console.debug(`[pipeline] ${state.stage} -> ${stage}`);
       }
-      // 语音播报结束后统一回收到中性表情，避免“说完后表情停留”。
-      if (state.stage === 'speaking' && stage === 'idle') {
-        useAvatarStore.getState().setEmotion('neutral');
+      // 任何阶段回到 idle 时，都强制回收到基础状态，避免动作/表情残留。
+      if (state.stage !== 'idle' && stage === 'idle') {
+        const avatarState = useAvatarStore.getState();
+        avatarState.setEmotion('neutral');
+        return { stage, avatarAnimation: 'idle' };
       }
       return { stage };
     }),

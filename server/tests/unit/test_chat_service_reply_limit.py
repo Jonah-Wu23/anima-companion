@@ -23,3 +23,13 @@ def test_sanitize_assistant_text_prefers_comma_or_period_when_truncating() -> No
 
 def test_resolve_assistant_text_limit_for_luotianyi_is_60() -> None:
     assert _resolve_assistant_text_limit("luotianyi") == 60
+
+
+def test_sanitize_assistant_text_falls_back_when_reply_is_pure_narration() -> None:
+    raw = "他耳尖微微泛红，笑着挠了挠后脑勺，脚步已经往市集方向迈去。"
+    assert _sanitize_assistant_text(raw) == "我在。"
+
+
+def test_sanitize_assistant_text_extracts_quoted_dialogue_from_narration() -> None:
+    raw = "她轻轻偏过头，小声说：“好呀，我们一起去。”"
+    assert _sanitize_assistant_text(raw) == "好呀，我们一起去。"

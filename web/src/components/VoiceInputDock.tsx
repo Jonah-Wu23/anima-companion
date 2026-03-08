@@ -471,6 +471,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isVipModalOpen, setIsVipModalOpen] = useState(false);
+  const [vipModalSource, setVipModalSource] = useState<'active' | 'passive' | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
   const [visualEnergy, setVisualEnergy] = useState(0);
   
@@ -500,6 +501,9 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const currentCharacterId = useCharacterStore((state) => state.currentCharacterId);
   const autoPlayVoice = useSettingsStore((state) => state.autoPlayVoice);
   const vipModeEnabled = useSettingsStore((state) => state.vipModeEnabled);
+  const vipAutoPromptDismissed = useSettingsStore((state) => state.vipAutoPromptDismissed);
+  const dismissVipAutoPrompt = useSettingsStore((state) => state.dismissVipAutoPrompt);
+  const resetVipAutoPrompt = useSettingsStore((state) => state.resetVipAutoPrompt);
   const setAvatarEmotion = useAvatarStore((state) => state.setEmotion);
   const currentCharacter = getCharacterById(currentCharacterId);
   const personaId = getCharacterPersonaId(currentCharacterId);
@@ -768,6 +772,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const startVADRecorder = useCallback(async () => {
     if (vadRecorderRef.current?.isRunning()) return;
     if (!vipModeEnabled) {
+      setVipModalSource('active');
       setIsVipModalOpen(true);
       setInputMode('text');
       setVADStatus('idle');
@@ -881,6 +886,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   const handleInputModeChange = useCallback(async (nextMode: InputMode) => {
     if (nextMode === inputMode) return;
     if (nextMode !== 'text' && !vipModeEnabled) {
+      setVipModalSource('active');
       setIsVipModalOpen(true);
       return;
     }
@@ -937,6 +943,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
     if (inputMode !== 'push-to-talk') return;
     if (isRecordingLocal) return;
     if (!vipModeEnabled) {
+      setVipModalSource('active');
       setIsVipModalOpen(true);
       return;
     }
@@ -1110,7 +1117,8 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       });
       applyAssistantState(response.emotion, response.animation);
 
-      if (autoPlayVoice && !vipModeEnabled) {
+      if (autoPlayVoice && !vipModeEnabled && !vipAutoPromptDismissed) {
+        setVipModalSource('passive');
         setIsVipModalOpen(true);
       }
 
@@ -1138,7 +1146,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
       setError(extractApiErrorMessage(err, "发送失败，请重试"));
       setStage('error');
     }
-  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, playAssistantAudioBase64, personaId, qwenTtsPayload]);
+  }, [inputValue, addMessage, applyAssistantState, setStage, setError, sessionId, stopPlaybackAndLipSync, autoPlayVoice, vipModeEnabled, vipAutoPromptDismissed, playAssistantAudioBase64, personaId, qwenTtsPayload]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1239,9 +1247,19 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
   }, [stage, pipelineError, isVADMode, vadStatus, vadConfig.label, isPushToTalkMode, isRecordingLocal, recordingDuration, isPipelineBusy]);
 
   const handleActivateVip = useCallback(() => {
+    resetVipAutoPrompt();
+    setVipModalSource(null);
     setIsVipModalOpen(false);
     router.push('/sponsor?return_to=/chat');
-  }, [router]);
+  }, [resetVipAutoPrompt, router]);
+
+  const handleCloseVipModal = useCallback(() => {
+    if (vipModalSource === 'passive') {
+      dismissVipAutoPrompt();
+    }
+    setVipModalSource(null);
+    setIsVipModalOpen(false);
+  }, [dismissVipAutoPrompt, vipModalSource]);
 
   return (
     <>
@@ -1452,7 +1470,7 @@ export function VoiceInputDock({ onOpenSettings }: { onOpenSettings: () => void 
 
       <VipModal
         isOpen={isVipModalOpen}
-        onClose={() => setIsVipModalOpen(false)}
+        onClose={handleCloseVipModal}
         onActivate={handleActivateVip}
       />
 

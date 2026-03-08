@@ -155,6 +155,7 @@ def _build_system_prompt(
         f"{persona_initial_part}"
         f"当前关系值={relationship}。"
         "assistant 内容中，真正说出口的台词必须放入 <speak>...</speak>。"
+        "禁止只输出动作、心理、场景或旁白；每轮都必须至少有一句可直接说出口的 <speak> 台词。"
         "动作、心理、场景、旁白必须写在 <speak> 标签外。"
         f"assistant 内容必须控制在 {assistant_char_limit} 个字以内（含标点），<speak> 标签本身不计入字数，超出时请自行压缩。"
         "输出必须严格包含以下标签："
