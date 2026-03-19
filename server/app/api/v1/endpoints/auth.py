@@ -197,7 +197,20 @@ def send_sms(
     try:
         send_result = sms_service.send_code(phone=normalized_phone, out_id=challenge.challenge_id)
     except SmsAuthError as exc:
-        raise HTTPException(status_code=502, detail="验证码发送失败，请稍后重试") from exc
+        store.delete_sms_challenge(challenge_id=challenge.challenge_id)
+        if exc.provider_code:
+            logger.warning(
+                "sms send upstream error mapped: status=%s provider_code=%s provider_message=%s phone=%s out_id=%s",
+                exc.http_status,
+                exc.provider_code,
+                exc.provider_message,
+                _mask_phone(normalized_phone),
+                _mask_text(challenge.challenge_id),
+            )
+        headers: dict[str, str] | None = None
+        if exc.http_status == 429 and exc.retry_after_sec > 0:
+            headers = {"Retry-After": str(exc.retry_after_sec)}
+        raise HTTPException(status_code=exc.http_status, detail=str(exc), headers=headers) from exc
     if send_result.provider_biz_id:
         store.update_sms_challenge_provider_biz_id(
             challenge_id=challenge.challenge_id,

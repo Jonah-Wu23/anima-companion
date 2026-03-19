@@ -8,6 +8,7 @@ import { Sparkles, UserPlus, Smartphone, KeyRound, Lock, Mail, ChevronRight, Ale
 
 import { verifyAliyunCaptcha } from "@/lib/auth/aliyun-captcha";
 import { api } from "@/lib/api/client";
+import { clearSmsCooldown, readSmsCooldown, writeSmsCooldown } from "@/lib/auth/sms-cooldown";
 import { useLegalDocumentModal } from "@/components/legal/use-legal-document-modal";
 import { markAuthPersistence } from "@/lib/auth/remember-me";
 
@@ -54,7 +55,9 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [smsChallengeId, setSmsChallengeId] = useState("");
-  const [smsCountdown, setSmsCountdown] = useState(0);
+  const [smsCooldownPhone, setSmsCooldownPhone] = useState("");
+  const [smsRetryUntilMs, setSmsRetryUntilMs] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [password, setPassword] = useState("");
   
   // Email registration state
@@ -79,17 +82,35 @@ export default function RegisterPage() {
   }, [router]);
 
   useEffect(() => {
-    if (smsCountdown <= 0) {
+    const saved = readSmsCooldown("register");
+    if (!saved) {
+      return;
+    }
+    setPhone((prev) => prev || saved.phone);
+    setSmsChallengeId(saved.challengeId);
+    setSmsCooldownPhone(saved.phone);
+    setSmsRetryUntilMs(saved.retryUntilMs);
+  }, []);
+
+  useEffect(() => {
+    const currentNow = Date.now();
+    setNowMs(currentNow);
+    if (smsRetryUntilMs <= currentNow) {
       return;
     }
     const timer = setInterval(() => {
-      setSmsCountdown((prev) => Math.max(0, prev - 1));
+      setNowMs(Date.now());
     }, 1000);
     return () => clearInterval(timer);
-  }, [smsCountdown]);
+  }, [smsRetryUntilMs]);
 
   const normalizedPhone = normalizePhone(phone);
   const normalizedEmail = normalizeEmail(email);
+  const isSmsCooldownForCurrentPhone = smsCooldownPhone === normalizedPhone && smsRetryUntilMs > nowMs;
+  const smsCountdown = isSmsCooldownForCurrentPhone
+    ? Math.max(0, Math.ceil((smsRetryUntilMs - nowMs) / 1000))
+    : 0;
+  const effectiveSmsChallengeId = smsCooldownPhone === normalizedPhone ? smsChallengeId : "";
   const canSendSms = normalizedPhone.length >= 11 && smsCountdown <= 0 && !sendingSms;
   
   const passwordScore = getPasswordScore(activeTab === "phone" ? password : emailPassword);
@@ -103,9 +124,9 @@ export default function RegisterPage() {
       agreed &&
       normalizedPhone.length >= 11 &&
       smsCode.trim().length >= 4 &&
-      smsChallengeId.length > 0 &&
+      effectiveSmsChallengeId.length > 0 &&
       password.length >= 6,
-    [agreed, normalizedPhone.length, password.length, redirecting, smsChallengeId.length, smsCode, submitting]
+    [agreed, effectiveSmsChallengeId.length, normalizedPhone.length, password.length, redirecting, smsCode, submitting]
   );
 
   // Email registration validation
@@ -173,7 +194,13 @@ export default function RegisterPage() {
         captcha_verify_param: captchaVerifyParam,
       });
       setSmsChallengeId(result.sms_challenge_id);
-      setSmsCountdown(result.retry_after_sec);
+      setSmsCooldownPhone(normalizedPhone);
+      setSmsRetryUntilMs(Date.now() + Math.max(0, result.retry_after_sec) * 1000);
+      writeSmsCooldown("register", {
+        challengeId: result.sms_challenge_id,
+        phone: normalizedPhone,
+        retryAfterSec: result.retry_after_sec,
+      });
     } catch (err) {
       setError(resolveCommonError(err));
     } finally {
@@ -184,11 +211,15 @@ export default function RegisterPage() {
   const handlePhoneSubmit = async (captchaVerifyParam: string) => {
     await api.register({
       phone: normalizedPhone,
-      sms_challenge_id: smsChallengeId,
+      sms_challenge_id: effectiveSmsChallengeId,
       sms_code: smsCode.trim(),
       password,
       captcha_verify_param: captchaVerifyParam,
     });
+    clearSmsCooldown("register");
+    setSmsChallengeId("");
+    setSmsCooldownPhone("");
+    setSmsRetryUntilMs(0);
   };
 
   const handleEmailSubmit = async (captchaVerifyParam: string) => {
@@ -215,6 +246,10 @@ export default function RegisterPage() {
       } else {
         await handleEmailSubmit(captchaVerifyParam);
       }
+      clearSmsCooldown("register");
+      setSmsChallengeId("");
+      setSmsCooldownPhone("");
+      setSmsRetryUntilMs(0);
       markAuthPersistence(false);
       succeeded = true;
       setRedirecting(true);

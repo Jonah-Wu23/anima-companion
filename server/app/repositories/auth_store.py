@@ -429,6 +429,16 @@ class AuthStore:
                 (provider_biz_id, challenge_id),
             )
 
+    def delete_sms_challenge(self, *, challenge_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM auth_sms_challenges
+                WHERE challenge_id = ?
+                """,
+                (challenge_id,),
+            )
+
     def find_sms_challenge(self, *, challenge_id: str) -> SmsChallenge | None:
         with self._connect() as conn:
             row = conn.execute(

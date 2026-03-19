@@ -10,7 +10,7 @@ from app.dependencies import get_auth_store, get_captcha_verifier, get_sms_auth_
 from app.main import app
 from app.repositories.auth_store import AuthStore
 from app.services.auth.captcha_verifier import CaptchaVerifyResult
-from app.services.auth.sms_auth_service import SmsSendResult
+from app.services.auth.sms_auth_service import SmsAuthError, SmsSendResult
 
 
 class DummyCaptchaVerifier:
@@ -37,6 +37,18 @@ class DummySmsAuthService:
     def verify_code(self, *, phone: str, out_id: str, verify_code: str) -> bool:
         expected = self._codes.get((phone, out_id))
         return expected is not None and verify_code == expected
+
+
+class FrequencyLimitedSmsAuthService(DummySmsAuthService):
+    def send_code(self, *, phone: str, out_id: str) -> SmsSendResult:
+        _ = phone, out_id
+        raise SmsAuthError(
+            "验证码发送过于频繁，请稍后再试",
+            provider_code="BIZ.FREQUENCY",
+            provider_message="check frequency failed",
+            http_status=429,
+            retry_after_sec=60,
+        )
 
 
 class IntegrityInjectingConnection(sqlite3.Connection):
@@ -97,6 +109,19 @@ def _override_deps(tmp_path) -> tuple[AuthStore, DummySmsAuthService]:
     app.dependency_overrides[get_captcha_verifier] = lambda: DummyCaptchaVerifier()
     app.dependency_overrides[get_sms_auth_service] = lambda: sms_service
     return store, sms_service
+
+
+def _override_deps_with_sms_service(store: AuthStore, sms_service: object) -> None:
+    base_settings = get_settings()
+    test_settings = replace(
+        base_settings,
+        auth_cookie_name="anima_sid_test",
+        auth_cookie_secure=False,
+    )
+    app.dependency_overrides[get_auth_store] = lambda: store
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    app.dependency_overrides[get_captcha_verifier] = lambda: DummyCaptchaVerifier()
+    app.dependency_overrides[get_sms_auth_service] = lambda: sms_service
 
 
 def _override_deps_with_store(store: AuthStore) -> DummySmsAuthService:
@@ -847,5 +872,32 @@ def test_auth_store_recovers_when_auth_tables_missing(tmp_path) -> None:
             )
             assert login_resp.status_code == 401
             assert login_resp.json()["detail"] == "账号或密码错误"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_send_sms_maps_frequency_limit_to_429_and_cleans_challenge(tmp_path) -> None:
+    store = AuthStore(
+        db_path=tmp_path / "auth.db",
+        session_secret="test-secret",
+        session_ttl_seconds=3600,
+    )
+    _override_deps_with_sms_service(store, FrequencyLimitedSmsAuthService())
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                "/v1/auth/sms/send",
+                json={
+                    "phone": "13800000123",
+                    "scene": "login",
+                    "captcha_verify_param": "captcha-sms-param",
+                },
+            )
+            assert resp.status_code == 429
+            assert resp.json()["detail"] == "验证码发送过于频繁，请稍后再试"
+
+        with sqlite3.connect(tmp_path / "auth.db") as conn:
+            count = conn.execute("SELECT COUNT(*) FROM auth_sms_challenges").fetchone()[0]
+        assert count == 0
     finally:
         app.dependency_overrides.clear()

@@ -10,6 +10,21 @@ from dataclasses import dataclass
 class SmsAuthError(RuntimeError):
     """短信服务调用失败。"""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider_code: str = "",
+        provider_message: str = "",
+        http_status: int = 502,
+        retry_after_sec: int = 0,
+    ) -> None:
+        super().__init__(message)
+        self.provider_code = provider_code
+        self.provider_message = provider_message
+        self.http_status = http_status
+        self.retry_after_sec = retry_after_sec
+
 
 @dataclass(frozen=True)
 class SmsSendResult:
@@ -47,24 +62,38 @@ class SmsAuthService:
 
     def send_code(self, *, phone: str, out_id: str) -> SmsSendResult:
         if not phone.strip() or not out_id.strip():
-            raise SmsAuthError("AUTH_SMS_INVALID")
+            raise SmsAuthError("手机号或挑战 ID 无效", http_status=400)
         client = self._create_client()
         request, runtime = self._build_send_request(phone=phone, out_id=out_id)
         try:
             response = client.send_sms_verify_code_with_options(request, runtime)
         except Exception as exc:  # noqa: BLE001
-            raise SmsAuthError("AUTH_SMS_INVALID") from exc
+            raise SmsAuthError("短信服务暂时不可用，请稍后重试", http_status=502) from exc
         body = getattr(response, "body", response)
         code = _read_value(body, "code").upper()
+        message = _read_value(body, "message")
         if code not in {"OK", "SUCCESS"}:
             logger.warning(
                 "sms send failed: code=%s message=%s phone=%s out_id=%s",
                 code,
-                _read_value(body, "message"),
+                message,
                 _mask_phone(phone),
                 _mask_text(out_id),
             )
-            raise SmsAuthError("AUTH_SMS_INVALID")
+            if code == "BIZ.FREQUENCY":
+                raise SmsAuthError(
+                    "验证码发送过于频繁，请稍后再试",
+                    provider_code=code,
+                    provider_message=message,
+                    http_status=429,
+                    retry_after_sec=self._interval_seconds,
+                )
+            raise SmsAuthError(
+                "验证码发送失败，请稍后重试",
+                provider_code=code,
+                provider_message=message,
+                http_status=502,
+            )
         model = getattr(body, "model", None)
         provider_biz_id = _read_value(model, "biz_id") or _read_value(body, "biz_id")
         return SmsSendResult(provider_biz_id=provider_biz_id, retry_after_sec=self._interval_seconds)
@@ -144,14 +173,14 @@ class SmsAuthService:
 
     def _create_client(self):  # type: ignore[no-untyped-def]
         if not self._access_key_id or not self._access_key_secret:
-            raise SmsAuthError("AUTH_SMS_INVALID")
+            raise SmsAuthError("短信服务 AK/SK 未配置", http_status=500)
         if not self._sign_name or not self._template_code or not self._template_param:
-            raise SmsAuthError("AUTH_SMS_INVALID")
+            raise SmsAuthError("短信模板配置不完整", http_status=500)
         try:
             from alibabacloud_dypnsapi20170525.client import Client as DypnsapiClient
             from alibabacloud_tea_openapi import models as open_api_models
         except Exception as exc:  # noqa: BLE001
-            raise SmsAuthError("AUTH_SMS_INVALID") from exc
+            raise SmsAuthError("短信 SDK 不可用", http_status=500) from exc
         config = open_api_models.Config(
             access_key_id=self._access_key_id,
             access_key_secret=self._access_key_secret,
@@ -164,7 +193,7 @@ class SmsAuthService:
             from alibabacloud_dypnsapi20170525 import models as dypns_models
             from alibabacloud_tea_util import models as util_models
         except Exception as exc:  # noqa: BLE001
-            raise SmsAuthError("AUTH_SMS_INVALID") from exc
+            raise SmsAuthError("短信 SDK 不可用", http_status=500) from exc
         request = dypns_models.SendSmsVerifyCodeRequest(
             phone_number=phone,
             sign_name=self._sign_name,
@@ -184,7 +213,7 @@ class SmsAuthService:
             from alibabacloud_dypnsapi20170525 import models as dypns_models
             from alibabacloud_tea_util import models as util_models
         except Exception as exc:  # noqa: BLE001
-            raise SmsAuthError("AUTH_SMS_INVALID") from exc
+            raise SmsAuthError("短信 SDK 不可用", http_status=500) from exc
         request = dypns_models.CheckSmsVerifyCodeRequest(
             phone_number=phone,
             verify_code=verify_code,

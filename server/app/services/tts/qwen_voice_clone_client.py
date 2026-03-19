@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
 import re
 import threading
 import time
@@ -19,6 +20,7 @@ QWEN_VOICE_ENROLLMENT_MODEL = "qwen-voice-enrollment"
 DEFAULT_QWEN_CUSTOMIZATION_URL = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
 DEFAULT_QWEN_REALTIME_WS_URL = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
 VOICE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{1,16}$")
+logger = logging.getLogger(__name__)
 
 
 class QwenVoiceClientError(RuntimeError):
@@ -93,51 +95,96 @@ def synthesize(text: str, *, model: str, voice_id: str) -> tuple[bytes, str]:
         raise QwenVoiceClientError("dashscope SDK 缺少 qwen_tts_realtime 依赖") from exc
 
     dashscope.api_key = api_key
-    collector = _RealtimeAudioCollector()
+    ws_url = settings.qwen_tts_realtime_ws_url.strip() or DEFAULT_QWEN_REALTIME_WS_URL
+    last_exc: Exception | None = None
+    for attempt in range(1, 3):
+        collector = _RealtimeAudioCollector()
 
-    class _Callback(QwenTtsRealtimeCallback):
-        def on_open(self) -> None:
-            collector.on_open()
+        class _Callback(QwenTtsRealtimeCallback):
+            def on_open(self) -> None:
+                collector.on_open()
 
-        def on_close(self, close_status_code: int, close_msg: str) -> None:
-            collector.on_close(close_status_code, close_msg)
+            def on_close(self, close_status_code: int, close_msg: str) -> None:
+                collector.on_close(close_status_code, close_msg)
 
-        def on_event(self, response: dict[str, Any]) -> None:
-            collector.on_event(response)
+            def on_event(self, response: dict[str, Any]) -> None:
+                collector.on_event(response)
 
-    client = QwenTtsRealtime(
-        model=chosen_model,
-        callback=_Callback(),
-        url=settings.qwen_tts_realtime_ws_url.strip() or DEFAULT_QWEN_REALTIME_WS_URL,
-    )
-    try:
-        client.connect()
-        client.update_session(
-            voice=voice_id.strip(),
-            response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
-            mode="server_commit",
+        client = QwenTtsRealtime(
+            model=chosen_model,
+            callback=_Callback(),
+            url=ws_url,
         )
-        client.append_text(clean_text)
-        client.finish()
-        if not collector.wait_done(timeout_seconds=max(settings.provider_probe_timeout_seconds * 20, 30.0)):
-            raise QwenVoiceClientError("等待 realtime 合成超时（未收到 session.finished）")
-        if collector.error_text:
-            raise QwenVoiceClientError(f"realtime 合成失败: {collector.error_text}")
-        if not collector.pcm_audio:
-            raise QwenVoiceClientError("realtime 未返回音频数据")
-        wav_bytes = _pcm16_mono_24k_to_wav_bytes(bytes(collector.pcm_audio))
-        return wav_bytes, "audio/wav"
-    except Exception as exc:  # noqa: BLE001
-        if isinstance(exc, QwenVoiceClientError):
-            raise
-        raise QwenVoiceClientError(f"千问 realtime 合成失败: {exc}") from exc
-    finally:
-        close = getattr(client, "close", None)
-        if callable(close):
-            try:
-                close()
-            except Exception:  # noqa: BLE001
-                pass
+        stage = "connect"
+        started_at = time.perf_counter()
+        try:
+            logger.info(
+                "qwen realtime tts start: attempt=%s model=%s voice_id=%s ws_url=%s text_len=%s",
+                attempt,
+                chosen_model,
+                voice_id.strip(),
+                ws_url,
+                len(clean_text),
+            )
+            client.connect()
+            logger.info(
+                "qwen realtime tts connected: attempt=%s elapsed_ms=%s",
+                attempt,
+                int((time.perf_counter() - started_at) * 1000),
+            )
+            stage = "update_session"
+            client.update_session(
+                voice=voice_id.strip(),
+                response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+                mode="server_commit",
+            )
+            logger.info("qwen realtime tts session updated: attempt=%s", attempt)
+            stage = "append_text"
+            client.append_text(clean_text)
+            stage = "finish"
+            client.finish()
+            logger.info("qwen realtime tts text committed: attempt=%s", attempt)
+            stage = "wait_done"
+            if not collector.wait_done(timeout_seconds=max(settings.provider_probe_timeout_seconds * 20, 30.0)):
+                raise QwenVoiceClientError("等待 realtime 合成超时（未收到 session.finished）")
+            if collector.error_text:
+                raise QwenVoiceClientError(f"realtime 合成失败: {collector.error_text}")
+            if not collector.pcm_audio:
+                raise QwenVoiceClientError("realtime 未返回音频数据")
+            logger.info(
+                "qwen realtime tts audio ready: attempt=%s bytes=%s elapsed_ms=%s",
+                attempt,
+                len(collector.pcm_audio),
+                int((time.perf_counter() - started_at) * 1000),
+            )
+            wav_bytes = _pcm16_mono_24k_to_wav_bytes(bytes(collector.pcm_audio))
+            return wav_bytes, "audio/wav"
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            logger.warning(
+                "qwen realtime tts failed: attempt=%s stage=%s elapsed_ms=%s error=%s",
+                attempt,
+                stage,
+                int((time.perf_counter() - started_at) * 1000),
+                exc,
+            )
+            if stage == "connect" and attempt < 2:
+                time.sleep(0.3)
+                continue
+            if isinstance(exc, QwenVoiceClientError):
+                raise
+            raise QwenVoiceClientError(f"千问 realtime 合成失败: {exc}") from exc
+        finally:
+            close = getattr(client, "close", None)
+            if callable(close):
+                try:
+                    close()
+                    logger.info("qwen realtime tts closed: attempt=%s", attempt)
+                except Exception as close_exc:  # noqa: BLE001
+                    logger.warning("qwen realtime tts close failed: attempt=%s error=%s", attempt, close_exc)
+    if isinstance(last_exc, QwenVoiceClientError):
+        raise last_exc
+    raise QwenVoiceClientError(f"千问 realtime 合成失败: {last_exc}")
 
 
 def create_voice(
