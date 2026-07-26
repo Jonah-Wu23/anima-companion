@@ -47,13 +47,32 @@ cd "${REPO_ROOT}"
 CONVERT_SCRIPT="scripts/bootstrap/convert_model_textures_to_webp.py"
 VERIFY_SCRIPT="scripts/validation/verify_model_texture_webp.py"
 
-# ---------- 选择 Python ----------
-if [[ -x "server/.venv/bin/python" ]]; then
-  PY="server/.venv/bin/python"
-elif command -v python3 >/dev/null 2>&1; then
-  PY="python3"
-else
-  echo "[webp-oneclick] 未找到可用的 python（server/.venv/bin/python 或 python3）" >&2
+# ---------- 选择 Python（逐个验证能真正执行）----------
+PY=""
+CANDIDATES=(
+  "server/.venv/bin/python"
+  "server/venv/bin/python"
+  "python3"
+  "python"
+)
+for cand in "${CANDIDATES[@]}"; do
+  if [[ "${cand}" == */* ]]; then
+    [[ -x "${cand}" ]] || continue
+  else
+    command -v "${cand}" >/dev/null 2>&1 || continue
+  fi
+  # 不仅要存在，还要能执行（排除 /usr/bin/python3 无执行权限等情况）
+  if "${cand}" -c "import sys" >/dev/null 2>&1; then
+    PY="${cand}"
+    break
+  fi
+  echo "[webp-oneclick] 候选 ${cand} 存在但无法执行，跳过" >&2
+done
+
+if [[ -z "${PY}" ]]; then
+  echo "[webp-oneclick] 未找到可执行的 python，请检查以下位置：" >&2
+  echo "  ls -l server/.venv/bin/python* /usr/bin/python3*" >&2
+  echo "若是 /usr/bin/python3 无执行权限，可执行: chmod +x /usr/bin/python3*" >&2
   exit 1
 fi
 echo "[webp-oneclick] python=${PY} root=${ROOT}"
