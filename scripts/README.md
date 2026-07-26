@@ -20,6 +20,7 @@
 - `validation/validate_configs.ps1`：校验人物卡 JSON + `configs/` 下 YAML
 - `validation/optional_web_typecheck.ps1`：可选执行 Web TypeScript 类型检查（依赖缺失可跳过）
 - `validation/verify_model_texture_webp.py`：校验模型贴图 `.webp` 覆盖率、可解码性与尺寸一致性
+- `release/server_webp_convert.sh`：服务器端一键执行 WebP 转换（dry-run -> apply -> verify，root 执行时自动 `chown` 回 `www:www`）
 
 ## 约定
 - 脚本命名使用 `snake_case`，例如 `validate_persona_config.ps1`。

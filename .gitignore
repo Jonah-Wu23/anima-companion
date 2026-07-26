@@ -85,5 +85,5 @@ assets/motions/phainon/raw/
 testsprite_tests/
 server/.data/companion.db
 
-# release
-release/
+# release（仅忽略仓库根目录的发布产物，不影响 scripts/release、docs/runbooks/release）
+/release/
