@@ -1,0 +1,40 @@
+name: Temporary ASR model fetch
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-models:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Chinese Zipformer model
+        run: |
+          set -euxo pipefail
+          mkdir -p models/zh_zipformer
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o /tmp/zh-model.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2
+          tar -xjf /tmp/zh-model.tar.bz2 -C models/zh_zipformer --strip-components=1
+
+      - name: Download multilingual Whisper tiny q5 model
+        run: |
+          set -euxo pipefail
+          mkdir -p models/whisper_tiny_q5
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o /tmp/whisper.tar.gz \
+            https://huggingface.co/echogarden/echogarden-packages/resolve/main/whisper.cpp-tiny-q5_1-20240405.tar.gz
+          tar -xzf /tmp/whisper.tar.gz -C models/whisper_tiny_q5 --strip-components=1
+          find models -maxdepth 3 -type f -printf '%p %s bytes\n'
+
+      - name: Upload models
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-asr-models
+          path: models
+          retention-days: 1
+          compression-level: 0
