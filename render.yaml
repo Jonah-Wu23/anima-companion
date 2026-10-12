@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: anima-companion-api
+    runtime: python
+    plan: free
+    region: singapore
+    branch: deploy/free-render-fullstack-20261013
+    buildCommand: pip install -e ./server
+    startCommand: cd server && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: AUTH_SESSION_SECRET
+        generateValue: true
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+  - type: web
+    name: anima-companion-web
+    runtime: node
+    plan: free
+    region: singapore
+    branch: deploy/free-render-fullstack-20261013
+    buildCommand: npm ci && npm run build:web
+    startCommand: cd web && ../node_modules/.bin/next start -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: /backend
+      - key: BACKEND_PROXY_TARGET
+        fromService:
+          name: anima-companion-api
+          type: web
+          property: hostport
