@@ -29,7 +29,4 @@ services:
       - key: NEXT_PUBLIC_API_BASE_URL
         value: /backend
       - key: BACKEND_PROXY_TARGET
-        fromService:
-          name: anima-companion-api
-          type: web
-          property: hostport
+        value: https://anima-companion-api.onrender.com
