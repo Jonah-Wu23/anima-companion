@@ -1,9 +1,12 @@
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 /** @type {import('next').NextConfig} */
 const skipBuildChecks = process.env.BT_DEPLOY_SKIP_CHECKS === '1';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const threeRoot = path.resolve(path.dirname(require.resolve('three')), '..');
 
 const nextConfig = {
   reactStrictMode: true,
@@ -19,7 +22,7 @@ const nextConfig = {
     // 强制全项目共用同一份 three，避免 MMD/R3F 出现多实例导致的运行时异常。
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
-      three: path.resolve(__dirname, 'node_modules/three'),
+      three: threeRoot,
     };
 
     config.ignoreWarnings = [
